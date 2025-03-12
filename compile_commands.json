@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/tony/Repos/vulkanengine/build",
+  "command": "/usr/bin/c++  -I/home/tony/Repos/vulkanengine/src -g -std=gnu++20 -o CMakeFiles/vulkanengine.dir/src/VkBootstrap.cpp.o -c /home/tony/Repos/vulkanengine/src/VkBootstrap.cpp",
+  "file": "/home/tony/Repos/vulkanengine/src/VkBootstrap.cpp",
+  "output": "CMakeFiles/vulkanengine.dir/src/VkBootstrap.cpp.o"
+},
+{
+  "directory": "/home/tony/Repos/vulkanengine/build",
+  "command": "/usr/bin/c++  -I/home/tony/Repos/vulkanengine/src -g -std=gnu++20 -o CMakeFiles/vulkanengine.dir/src/main.cpp.o -c /home/tony/Repos/vulkanengine/src/main.cpp",
+  "file": "/home/tony/Repos/vulkanengine/src/main.cpp",
+  "output": "CMakeFiles/vulkanengine.dir/src/main.cpp.o"
+}
+]
