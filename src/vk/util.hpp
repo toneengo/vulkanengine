@@ -1,5 +1,14 @@
 #pragma once
 #include "create_info.hpp"
+#include "create_info.hpp"
+#include <fstream>
+#include <memory>
+#include "lib/util.hpp"
+
+#include <glslang/Public/ShaderLang.h>
+#include <glslang/Public/ResourceLimits.h>
+#include <glslang/SPIRV/GlslangToSpv.h>
+#include <memory_resource>
 
 namespace vkutil {
     inline VkImageSubresourceRange image_subresource_range(VkImageAspectFlags aspectMask)
@@ -73,5 +82,62 @@ namespace vkutil {
 
         vkCmdBlitImage2(cmd, &blitInfo);
     }
+    static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shaderSource)
+    {
+        glslang::InitializeProcess();
+        glslang::TShader shader(EShLangCompute);
+        shader.setStrings(shaderSource, 1);
+        shader.setEnvInput(glslang::EShSourceGlsl, EShLangCompute, glslang::EShClientVulkan, 100);
+        shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
+        shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
+        shader.parse(GetDefaultResources(), 100, false, EShMsgDefault);
 
+        glslang::TProgram program;
+        program.addShader(&shader);
+        program.link(EShMsgDefault);
+
+        std::vector<uint32_t> spirv;
+        glslang::GlslangToSpv(*program.getIntermediate(EShLangCompute), spirv);
+
+        glslang::FinalizeProcess();
+
+        return spirv;
+    }
+    inline bool load_shader_module(const char* filePath,
+    VkDevice device,
+    VkShaderModule* outShaderModule)
+    {
+        // open the file. With cursor at the end
+        std::ifstream file(filePath, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            return false;
+        }
+
+        // because the cursor is at the end, it gives the size directly in bytes
+        size_t fileSize = (size_t)file.tellg();
+        char* buf = new char[fileSize];
+        file.seekg(0);
+        file.read(buf, fileSize);
+        file.close();
+
+        auto spirv = compileShaderToSPIRV_Vulkan(&buf);
+        delete [] buf;
+
+        // create a new shader module, using the buffer we loaded
+        VkShaderModuleCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.codeSize = spirv.size() * sizeof(uint32_t);
+        createInfo.pCode = spirv.data();
+
+        // check that the creation goes well.
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            return false;
+        }
+
+        *outShaderModule = shaderModule;
+        return true;
+    }
 }
