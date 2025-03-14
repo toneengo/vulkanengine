@@ -12,7 +12,7 @@ void Object::destroy()
             vmaDestroyAllocator(ctx->allocator);
             break;
         case VKOBJ::DescriptorPool:
-            da.destroy_pool(ctx->device);
+            vkDestroyDescriptorPool(ctx->device, dp, nullptr);
             break;
         case VKOBJ::DescriptorSetLayout:
             vkDestroyDescriptorSetLayout(ctx->device, dsl, nullptr); 
@@ -22,6 +22,12 @@ void Object::destroy()
             break;
         case VKOBJ::Pipeline:
             vkDestroyPipeline(ctx->device, pl, nullptr);
+            break;
+        case VKOBJ::Fence:
+            vkDestroyFence(ctx->device, fence, nullptr);
+            break;
+        case VKOBJ::CommandPool:
+            vkDestroyCommandPool(ctx->device, commandPool, nullptr);
             break;
         default:
             break;

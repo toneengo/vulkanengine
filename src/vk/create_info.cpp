@@ -1,4 +1,5 @@
 #include "create_info.hpp"
+#include <vulkan/vulkan_core.h>
 
 namespace vkinit {
     VkCommandPoolCreateInfo command_pool_create_info(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags)
@@ -129,5 +130,37 @@ namespace vkinit {
         return info;
     }
     VkPresentInfoKHR present_info();
+    VkRenderingAttachmentInfo attachment_info(VkImageView view, VkClearValue* clear ,VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/)
+    {
+        VkRenderingAttachmentInfo colorAttachment {};
+        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colorAttachment.pNext = nullptr;
+
+        colorAttachment.imageView = view;
+        colorAttachment.imageLayout = layout;
+        colorAttachment.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        if (clear) {
+            colorAttachment.clearValue = *clear;
+        }
+
+        return colorAttachment;
+    }
+    VkRenderingInfo rendering_info(VkExtent2D extent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment)
+    {
+        VkRenderingInfo renderingInfo {};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.pNext = nullptr;
+        //renderingInfo.flags = 0;
+        renderingInfo.renderArea = {0, 0, extent.width, extent.height};
+        renderingInfo.layerCount = 1;
+        renderingInfo.viewMask = 0;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments = colorAttachment;
+        renderingInfo.pDepthAttachment = depthAttachment;
+
+        return renderingInfo;
+    }
+ 
     VkRenderPassBeginInfo renderpass_begin_info(VkRenderPass renderPass, VkExtent2D windowExtent, VkFramebuffer framebuffer);
 }

@@ -7,6 +7,7 @@
 #include "descriptor.hpp"
 #include "objects.hpp"
 #include "del_queue.hpp"
+#include <glm/glm.hpp>
 
 struct FrameData {
 	VkCommandPool commandPool;
@@ -16,6 +17,15 @@ struct FrameData {
 
     DeletionQueue frameDeletionQueue;
 };
+
+struct ComputePushConstants {
+	glm::vec4 data1;
+	glm::vec4 data2;
+	glm::vec4 data3;
+	glm::vec4 data4;
+};
+
+using ImmFn = void(*)(VkCommandBuffer cmd);
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
@@ -31,6 +41,8 @@ public:
     void init_commands();
     void init_sync_structures();
     void init_descriptors();
+    void init_imgui();
+    void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
     void draw();
     void draw_background(VkCommandBuffer cmd);
     void init_pipelines();
@@ -42,6 +54,8 @@ public:
     void cleanup();
 	FrameData& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
     VkInstance get_instance() { return instance; }
+
+    void immediate_submit(ImmFn);
 
 private:
     GLFWwindow* window;
@@ -83,4 +97,8 @@ private:
 	VkExtent2D swapchainExtent;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkInstance instance;
+
+    VkFence immFence;
+    VkCommandBuffer immCommandBuffer;
+    VkCommandPool immCommandPool;
 };

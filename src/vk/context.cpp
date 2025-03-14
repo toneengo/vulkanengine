@@ -1,3 +1,4 @@
+#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 
 #include "util.hpp"
@@ -17,6 +18,9 @@
 #include "lib/util.hpp"
 
 #include "context.hpp"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 #ifdef DBG 
     const bool enableValidationLayers = true;
@@ -44,6 +48,7 @@ void VulkanContext::init()
     init_sync_structures();
     init_descriptors();
     init_pipelines();
+    init_imgui();
 
     initialised = true;
 }
@@ -56,11 +61,19 @@ void VulkanContext::init_background_pipelines()
 	computeLayout.pSetLayouts = &drawImageDescriptorLayout;
 	computeLayout.setLayoutCount = 1;
 
+    VkPushConstantRange pushConstant{};
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(ComputePushConstants);
+    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    computeLayout.pPushConstantRanges = &pushConstant;
+    computeLayout.pushConstantRangeCount = 1;
+
 	VK_CHECK(vkCreatePipelineLayout(device, &computeLayout, nullptr, &gradientPipelineLayout));
 
     //layout code
 	VkShaderModule computeDrawShader;
-	if (!vkutil::load_shader_module("assets/shaders/gradient.comp", device, &computeDrawShader))
+	if (!vkutil::load_shader_module("assets/shaders/gradient_color.comp", device, &computeDrawShader))
 	{
 		fmt::print("Error when building the compute shader \n");
 	}
@@ -127,7 +140,7 @@ void VulkanContext::init_descriptors()
 
 	vkUpdateDescriptorSets(device, 1, &drawImageWrite, 0, nullptr);
 
-    mainDeletionQueue.push(globalDescriptorAllocator);
+    mainDeletionQueue.push(globalDescriptorAllocator.pool);
     mainDeletionQueue.push(drawImageDescriptorLayout);
 }
 
@@ -217,6 +230,71 @@ void VulkanContext::init_commands()
 		VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(frames[i].commandPool, 1);
 		VK_CHECK(vkAllocateCommandBuffers(device, &cmdAllocInfo, &frames[i].mainCommandBuffer));
 	}
+
+    VK_CHECK(vkCreateCommandPool(device, &commandPoolInfo, nullptr, &immCommandPool));
+	// allocate the command buffer for immediate submits
+	VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(immCommandPool, 1);
+
+	VK_CHECK(vkAllocateCommandBuffers(device, &cmdAllocInfo, &immCommandBuffer));
+    mainDeletionQueue.push(immCommandPool);
+}
+
+void VulkanContext::init_imgui()
+{
+    // this initializes the core structures of imgui
+    VkDescriptorPoolSize pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE },
+    };
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = 0;
+    for (VkDescriptorPoolSize& pool_size : pool_sizes)
+        pool_info.maxSets += pool_size.descriptorCount;
+    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.pPoolSizes = pool_sizes;
+
+    VkDescriptorPool imguiPool;
+    VK_CHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool));
+
+	ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(window, true);
+
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion = VK_API_VERSION_1_3;              // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
+    init_info.Instance = instance;
+    init_info.PhysicalDevice = chosenGPU;
+    init_info.Device = device;
+    init_info.QueueFamily = graphicsQueueFamily;
+    init_info.Queue = graphicsQueue;
+    init_info.PipelineCache = VK_NULL_HANDLE;
+    init_info.DescriptorPool = imguiPool;
+    init_info.UseDynamicRendering = true;
+    init_info.MinImageCount = 3;
+    init_info.ImageCount = 3;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    //dynamic rendering parameters for imgui to use
+	init_info.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+	init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+	init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchainImageFormat;
+    ImGui_ImplVulkan_Init(&init_info);
+    ImGui_ImplVulkan_CreateFontsTexture();
+
+
+    mainDeletionQueue.push(imguiPool);
+}
+
+void VulkanContext::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
+{
+	VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	VkRenderingInfo renderInfo = vkinit::rendering_info(swapchainExtent, &colorAttachment, nullptr);
+
+	vkCmdBeginRendering(cmd, &renderInfo);
+
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+	vkCmdEndRendering(cmd);
 }
 
 void VulkanContext::init_sync_structures()
@@ -234,6 +312,33 @@ void VulkanContext::init_sync_structures()
 		VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].swapchainSemaphore));
 		VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].renderSemaphore));
 	}
+    VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &immFence));
+    mainDeletionQueue.push(immFence);
+}
+
+void VulkanContext::immediate_submit(ImmFn function)
+{
+	VK_CHECK(vkResetFences(device, 1, &immFence));
+	VK_CHECK(vkResetCommandBuffer(immCommandBuffer, 0));
+
+	VkCommandBuffer cmd = immCommandBuffer;
+
+	VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+	function(cmd);
+
+	VK_CHECK(vkEndCommandBuffer(cmd));
+
+	VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
+	VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, nullptr, nullptr);
+
+	// submit command buffer to the queue and execute it.
+	//  _renderFence will now block until the graphic commands finish execution
+	VK_CHECK(vkQueueSubmit2(graphicsQueue, 1, &submit, immFence));
+
+	VK_CHECK(vkWaitForFences(device, 1, &immFence, true, 9999999999));
 }
 
 void VulkanContext::create_swapchain(uint32_t width, uint32_t height)
@@ -311,6 +416,14 @@ void VulkanContext::destroy_swapchain()
 void VulkanContext::render_loop()
 {
     while(!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+        ImGui::Render();
         draw();
     }
 }
@@ -332,13 +445,18 @@ void VulkanContext::draw_background(VkCommandBuffer cmd)
 	// bind the descriptor set containing the draw image for the compute pipeline
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, gradientPipelineLayout, 0, 1, &drawImageDescriptors, 0, nullptr);
 
+    ComputePushConstants pc;
+    pc.data1 = glm::vec4(1, 0, 0, 1);
+    pc.data2 = glm::vec4(0, 0, 1, 1);
+
+	vkCmdPushConstants(cmd, gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pc);
+
 	// execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
 	vkCmdDispatch(cmd, std::ceil(drawExtent.width / 16.0), std::ceil(drawExtent.height / 16.0), 1);
 
 }
 void VulkanContext::draw()
 {
-    glfwPollEvents();
 	// wait until the gpu has finished rendering the last frame. Timeout of 1
 	// second
 	VK_CHECK(vkWaitForFences(device, 1, &get_current_frame().renderFence, true, 1000000000));
@@ -356,7 +474,7 @@ void VulkanContext::draw()
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
     drawExtent.width = drawImage.imageExtent.width;
-    drawExtent.height = drawImage.imageExtent.width;
+    drawExtent.height = drawImage.imageExtent.height;
 
     vkutil::transition_image(cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
@@ -367,8 +485,11 @@ void VulkanContext::draw()
 
     vkutil::blit_image(cmd, drawImage.image, swapchainImages[swapchainImageIndex], drawExtent, swapchainExtent);
 
+    vkutil::transition_image(cmd, swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	draw_imgui(cmd, swapchainImageViews[swapchainImageIndex]);
+
 	//make the swapchain image into presentable mode
-    vkutil::transition_image(cmd, swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    vkutil::transition_image(cmd, swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	//finalize the command buffer (we can no longer add commands, but it can now be executed)
 	VK_CHECK(vkEndCommandBuffer(cmd));
@@ -412,6 +533,7 @@ void VulkanContext::cleanup()
 {
 	if (initialised) {
         vkDeviceWaitIdle(device);
+        ImGui_ImplVulkan_Shutdown();
         for (int i = 0; i < FRAME_OVERLAP; i++)
         {
             vkDestroyCommandPool(device, frames[i].commandPool, nullptr);

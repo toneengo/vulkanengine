@@ -18,9 +18,9 @@ find_package(glslang REQUIRED)
 target_link_libraries(vulkanengine PRIVATE glslang)
 target_link_libraries(vulkanengine PRIVATE glslang-default-resource-limits)
 
+target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
-target_include_directories(vulkanengine PRIVATE "src/")
-target_include_directories(vulkanengine PRIVATE "include/")
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/include/src)
 set(env{CMAKE_BUILD_PARALLEL_LEVEL} "16")
@@ -37,3 +37,13 @@ else()
     add_compile_options(-O3)
     message(STATUS "Configuring Sector33 in Release with CMake")
 endif()
+
+target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
+target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
+target_sources(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
+                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp"
+                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_demo.cpp"
+                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp"
+                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp"
+                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp"
+                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp")

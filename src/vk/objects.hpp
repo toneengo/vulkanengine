@@ -10,7 +10,9 @@ enum class VKOBJ
     DescriptorPool,
     DescriptorSetLayout,
     PipelineLayout,
-    Pipeline
+    Pipeline,
+    Fence,
+    CommandPool
 };
 
 struct AllocatedImage {
