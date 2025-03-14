@@ -1,0 +1,60 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 1,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "win64-base",
+      "description": "Target Windows with the Visual Studio development environment.",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+        "cacheVariables": {
+            "CMAKE_CXX_FLAGS": "/utf-8",
+            "CMAKE_C_COMPILER": "cl.exe",
+            "CMAKE_CXX_COMPILER": "cl.exe",
+            "CMAKE_TOOLCHAIN_FILE": "C:\\Users\\tongny\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+        },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+
+    {
+      "name": "win64-dbg",
+      "displayName": "Windows (64-bit) debug",
+      "inherits": "win64-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }, {
+      "name": "win64-rel",
+      "displayName": "Windows (64-bit) release",
+      "inherits": "win64-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "win64-dbg",
+      "displayName": "Windows (64-bit) debug",
+      "configurePreset": "win64-dbg"
+    }, {
+      "name": "win64-rel",
+      "displayName": "Windows (64-bit) release",
+      "configurePreset": "win64-rel"
+    }
+  ]
+}
