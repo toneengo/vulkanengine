@@ -19,6 +19,7 @@ struct Object
         VkPipeline pl;
         VkFence fence;
         VkCommandPool commandPool;
+        AllocatedBuffer buffer;
     };
     VKOBJ type;
     VulkanContext* ctx;
@@ -31,6 +32,7 @@ struct Object
     Object(VkPipeline _pl) : pl(_pl), type(VKOBJ::Pipeline) {}
     Object(VkFence _fence) : fence(_fence), type(VKOBJ::Fence) {}
     Object(VkCommandPool _commandPool) : commandPool(_commandPool), type(VKOBJ::CommandPool) {}
+    Object(AllocatedBuffer _buffer) : buffer(_buffer), type(VKOBJ::AllocatedBuffer) {}
 
     void destroy();
 };

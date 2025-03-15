@@ -1,5 +1,10 @@
 #include "util.hpp"
-#include <vulkan/vulkan_core.h>
+#include <glslang/Public/ShaderLang.h>
+#include <glslang/Public/ResourceLimits.h>
+#include <glslang/SPIRV/GlslangToSpv.h>
+#include <fstream>
+#include <set>
+#include <fmt/printf.h>
 
 //from glslang repo
 class DirStackFileIncluder : public glslang::TShader::Includer {
@@ -176,15 +181,15 @@ void vkutil::blit_image(VkCommandBuffer cmd, VkImage source, VkImage destination
     vkCmdBlitImage2(cmd, &blitInfo);
 }
 
-static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shaderSource)
+static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shaderSource, EShLanguage stage)
 {
     glslang::InitializeProcess();
     DirStackFileIncluder includer;
     includer.pushExternalLocalDirectory("assets/shaders");
 
-    glslang::TShader shader(EShLangCompute);
+    glslang::TShader shader(stage);
     shader.setDebugInfo(true);
-    shader.setEnvInput(glslang::EShSourceGlsl, EShLangCompute, glslang::EShClientVulkan, 100);
+    shader.setEnvInput(glslang::EShSourceGlsl, stage, glslang::EShClientVulkan, 100);
     shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
     shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
 
@@ -204,7 +209,7 @@ static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shad
     program.link(EShMsgDefault);
 
     std::vector<uint32_t> spirv;
-    glslang::GlslangToSpv(*program.getIntermediate(EShLangCompute), spirv);
+    glslang::GlslangToSpv(*program.getIntermediate(stage), spirv);
 
     glslang::FinalizeProcess();
 
@@ -213,9 +218,18 @@ static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shad
 bool vkutil::load_shader_module(const char* filePath, VkDevice device, VkShaderModule* outShaderModule)
 {
     // open the file. With cursor at the end
+    const char* extension = filePath + strlen(filePath) - 4;
+    EShLanguage stage;
+    if (strcmp(extension, "vert") == 0)
+        stage = EShLangVertex;
+    if (strcmp(extension, "frag") == 0)
+        stage = EShLangFragment;
+    if (strcmp(extension, "comp") == 0)
+        stage = EShLangCompute;
 
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
+        fmt::printf("Couldn't open file %s\n", filePath);
         return false;
     }
 
@@ -229,7 +243,7 @@ bool vkutil::load_shader_module(const char* filePath, VkDevice device, VkShaderM
     buf[i] = 0;
     file.close();
 
-    auto spirv = compileShaderToSPIRV_Vulkan(&buf);
+    auto spirv = compileShaderToSPIRV_Vulkan(&buf, stage);
     delete [] buf;
 
     // create a new shader module, using the buffer we loaded

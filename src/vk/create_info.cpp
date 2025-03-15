@@ -146,12 +146,12 @@ namespace vkinit {
 
         return colorAttachment;
     }
-    VkRenderingInfo rendering_info(VkExtent2D extent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment)
+    VkRenderingInfo rendering_info(VkExtent2D extent, VkRenderingAttachmentInfo* colorAttachment, VkRenderingAttachmentInfo* depthAttachment, VkRenderingFlags flags)
     {
         VkRenderingInfo renderingInfo {};
         renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         renderingInfo.pNext = nullptr;
-        //renderingInfo.flags = 0;
+        renderingInfo.flags = flags;
         renderingInfo.renderArea = {0, 0, extent.width, extent.height};
         renderingInfo.layerCount = 1;
         renderingInfo.viewMask = 0;
@@ -163,4 +163,22 @@ namespace vkinit {
     }
  
     VkRenderPassBeginInfo renderpass_begin_info(VkRenderPass renderPass, VkExtent2D windowExtent, VkFramebuffer framebuffer);
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info()
+    {
+        return {.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    }
+
+	VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info(VkShaderStageFlagBits stage, VkShaderModule shaderModule, VkPipelineShaderStageCreateFlags flags)
+    {
+        VkPipelineShaderStageCreateInfo pipelineInfo {};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        pipelineInfo.pNext = nullptr;
+        pipelineInfo.flags = flags;
+        pipelineInfo.stage = stage;
+        pipelineInfo.module = shaderModule;
+        pipelineInfo.pName = "main";
+        pipelineInfo.pSpecializationInfo = VK_NULL_HANDLE;
+
+        return pipelineInfo;
+    }
 }

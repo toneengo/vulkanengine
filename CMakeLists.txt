@@ -17,6 +17,8 @@ target_link_libraries(vulkanengine PRIVATE fmt::fmt)
 find_package(glslang REQUIRED)
 target_link_libraries(vulkanengine PRIVATE glslang::glslang)
 target_link_libraries(vulkanengine PRIVATE glslang::glslang-default-resource-limits)
+find_package(assimp REQUIRED)
+target_link_libraries(vulkanengine PRIVATE assimp::assimp)
 
 target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")

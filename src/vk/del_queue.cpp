@@ -29,6 +29,9 @@ void Object::destroy()
         case VKOBJ::CommandPool:
             vkDestroyCommandPool(ctx->device, commandPool, nullptr);
             break;
+        case VKOBJ::AllocatedBuffer:
+            vmaDestroyBuffer(ctx->allocator, buffer.buffer, buffer.allocation);
+            break;
         default:
             break;
     }
