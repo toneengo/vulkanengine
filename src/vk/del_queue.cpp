@@ -37,7 +37,7 @@ void Object::destroy()
     }
 }
 
-void DeletionQueue::flush(VkDevice _device, VmaAllocator _allocator)
+void DeletionQueue::flush()
 {
     for (int i = queue.size; i >= 0; i--)
     {

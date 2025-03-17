@@ -105,6 +105,7 @@ private:
     //draw resources
     VmaAllocator allocator;
 	AllocatedImage drawImage;
+    AllocatedImage depthImage;
 	VkExtent2D drawExtent;
 
 	VkPipelineLayout gradientPipelineLayout;

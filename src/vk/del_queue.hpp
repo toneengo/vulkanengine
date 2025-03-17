@@ -40,7 +40,7 @@ struct Object
 class DeletionQueue {
 friend class VulkanContext;
 public:
-    void flush(VkDevice _device, VmaAllocator _allocator);
+    void flush();
     void push(Object _o);
 private:
     VulkanContext* ctx;
