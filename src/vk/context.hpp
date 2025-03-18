@@ -60,6 +60,8 @@ public:
 	void init_background_pipelines();
     void init_default_data();
 
+    void resize_swapchain();
+
     void draw_geometry(VkCommandBuffer cmd);
     void render_loop();
     void create_swapchain(uint32_t width, uint32_t height);
@@ -76,8 +78,8 @@ private:
     std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
     struct {
-        uint32_t width;
-        uint32_t height;
+        int width;
+        int height;
     } windowInfo;
 
     bool initialised = false;
@@ -107,6 +109,7 @@ private:
 	AllocatedImage drawImage;
     AllocatedImage depthImage;
 	VkExtent2D drawExtent;
+    float renderScale = 1.f;
 
 	VkPipelineLayout gradientPipelineLayout;
 

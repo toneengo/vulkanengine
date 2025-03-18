@@ -33,15 +33,37 @@ float translate_z = -5;
     const bool enableValidationLayers = false;
 #endif
 
+bool resize_requested = true;
+
+void framebuffer_sz(GLFWwindow* window, int width, int height)
+{
+    resize_requested = true;
+}
+
+void VulkanContext::resize_swapchain()
+{
+    vkDeviceWaitIdle(device);
+
+	destroy_swapchain();
+
+	glfwGetWindowSize(window, &windowInfo.width, &windowInfo.height);
+
+	create_swapchain(windowInfo.width, windowInfo.height);
+
+	resize_requested = false;
+}
+
 void VulkanContext::init_glfw()
 {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
     window = glfwCreateWindow(800, 600, "vulkan engine", nullptr, nullptr);
     windowInfo.width = 800;
     windowInfo.height = 600;
+
+    glfwSetFramebufferSizeCallback(window, framebuffer_sz);
 }
 
 void VulkanContext::init_triangle_pipeline()
@@ -622,8 +644,8 @@ void VulkanContext::init_swapchain()
     create_swapchain(windowInfo.width, windowInfo.height);
     //draw image size will match the window
 	VkExtent3D drawImageExtent = {
-		windowInfo.width,
-		windowInfo.height,
+		1920,
+		1080,
 		1
 	};
 
@@ -686,6 +708,8 @@ void VulkanContext::render_loop()
 {
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        if (resize_requested) resize_swapchain();
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -825,8 +849,8 @@ void VulkanContext::draw()
     VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    drawExtent.width = drawImage.imageExtent.width;
-    drawExtent.height = drawImage.imageExtent.height;
+    drawExtent.width = std::min(drawImage.imageExtent.width, swapchainExtent.width) * renderScale;
+    drawExtent.height = std::min(drawImage.imageExtent.height, swapchainExtent.height) * renderScale;
 
     vkutil::transition_image(cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
@@ -920,9 +944,4 @@ void VulkanContext::cleanup()
         glfwTerminate();
 
 	}
-}
-
-void render()
-{
-    glfwPollEvents();
 }
