@@ -11,6 +11,14 @@
 #include <glm/glm.hpp>
 #include "loader.hpp"
 
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for sun power
+    glm::vec4 sunlightColor;
+};
 struct FrameData {
 	VkCommandPool commandPool;
 	VkCommandBuffer mainCommandBuffer;
@@ -18,6 +26,7 @@ struct FrameData {
     VkFence renderFence;
 
     DeletionQueue frameDeletionQueue;
+    DescriptorAllocatorGrowable frameDescriptors;
 };
 
 struct ComputePushConstants {
@@ -59,6 +68,10 @@ public:
     void init_pipelines();
 	void init_background_pipelines();
     void init_default_data();
+
+    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    void destroy_image(const AllocatedImage& img);
 
     void resize_swapchain();
 
@@ -111,13 +124,21 @@ private:
 	VkExtent2D drawExtent;
     float renderScale = 1.f;
 
+    AllocatedImage _whiteImage;
+	AllocatedImage _blackImage;
+	AllocatedImage _greyImage;
+	AllocatedImage _errorCheckerboardImage;
+
+    VkSampler _defaultSamplerLinear;
+	VkSampler _defaultSamplerNearest;
+
 	VkPipelineLayout gradientPipelineLayout;
 
     DeletionQueue mainDeletionQueue;
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void destroy_buffer(const AllocatedBuffer& buffer);
 
-	DescriptorAllocator globalDescriptorAllocator;
+	DescriptorAllocatorGrowable globalDescriptorAllocator;
 	VkDescriptorSet drawImageDescriptors;
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 
@@ -133,4 +154,8 @@ private:
     VkFence immFence;
     VkCommandBuffer immCommandBuffer;
     VkCommandPool immCommandPool;
+    VkDescriptorSetLayout _singleImageDescriptorLayout;
+
+    GPUSceneData sceneData;
+    VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 };

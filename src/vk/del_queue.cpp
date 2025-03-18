@@ -32,6 +32,12 @@ void Object::destroy()
         case VKOBJ::AllocatedBuffer:
             vmaDestroyBuffer(ctx->allocator, buffer.buffer, buffer.allocation);
             break;
+        case VKOBJ::Sampler:
+            vkDestroySampler(ctx->device, sampler, nullptr);
+            break;
+        case VKOBJ::DescriptorAllocatorGrowable:
+            dag->destroy_pools(ctx->device);
+            break;
         default:
             break;
     }
@@ -39,7 +45,7 @@ void Object::destroy()
 
 void DeletionQueue::flush()
 {
-    for (int i = queue.size; i >= 0; i--)
+    for (int i = queue.size-1; i >= 0; i--)
     {
         queue[i].destroy();
     }

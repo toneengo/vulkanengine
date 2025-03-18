@@ -20,6 +20,8 @@ struct Object
         VkFence fence;
         VkCommandPool commandPool;
         AllocatedBuffer buffer;
+        VkSampler sampler;
+        DescriptorAllocatorGrowable* dag;
     };
     VKOBJ type;
     VulkanContext* ctx;
@@ -33,6 +35,8 @@ struct Object
     Object(VkFence _fence) : fence(_fence), type(VKOBJ::Fence) {}
     Object(VkCommandPool _commandPool) : commandPool(_commandPool), type(VKOBJ::CommandPool) {}
     Object(AllocatedBuffer _buffer) : buffer(_buffer), type(VKOBJ::AllocatedBuffer) {}
+    Object(VkSampler _sampler) : sampler(_sampler), type(VKOBJ::Sampler) {}
+    Object(DescriptorAllocatorGrowable* _dag) : dag(_dag), type(VKOBJ::DescriptorAllocatorGrowable) {}
 
     void destroy();
 };

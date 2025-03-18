@@ -51,10 +51,16 @@ struct DynamicArray
     {
         if (size == capacity)
         {
-            if (capacity == 0) capacity++;
+            bool empty = false;
+            if (capacity == 0) {
+                capacity++;
+                empty = true;
+            }
             T* newData = new T[capacity * 2];
             memcpy(newData, data, sizeof(T)*size);
-            delete [] data;
+            
+            if (!empty)
+                delete [] data;
 
             data = newData;
             capacity *= 2;
@@ -67,10 +73,16 @@ struct DynamicArray
     {
         if (size == capacity)
         {
-            if (capacity == 0) capacity++;
+            bool empty = false;
+            if (capacity == 0) {
+                capacity++;
+                empty = true;
+            }
             T* newData = new T[capacity * 2];
             memcpy(newData, data, sizeof(T)*size);
-            delete [] data;
+            
+            if (!empty)
+                delete [] data;
 
             data = newData;
             capacity *= 2;

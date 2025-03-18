@@ -1,5 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
+#include "vk/descriptor.hpp"
 #include "vk_mem_alloc.h"
 #include <glm/glm.hpp>
 
@@ -14,7 +15,9 @@ enum class VKOBJ
     Pipeline,
     Fence,
     CommandPool,
-    AllocatedBuffer
+    AllocatedBuffer,
+    Sampler,
+    DescriptorAllocatorGrowable,
 };
 
 struct AllocatedImage {
