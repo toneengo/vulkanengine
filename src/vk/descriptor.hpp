@@ -1,62 +1,24 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
-#include <deque>
-struct DescriptorLayoutBuilder {
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
+namespace engine {
+    struct DescriptorAllocator
+    {
+        struct PoolSizeRatio {
+            VkDescriptorType type;
+            float ratio;
+        };
 
-    void add_binding(uint32_t binding, VkDescriptorType type);
-    void clear();
-    VkDescriptorSetLayout build(VkDevice device, VkShaderStageFlags shaderStages, void* pNext = nullptr, VkDescriptorSetLayoutCreateFlags flags = 0);
-};
+        bool initialised = false;
+        std::vector<PoolSizeRatio> ratios;
+        std::vector<VkDescriptorPool> pools;
+        uint32_t currentPool = 0;
+        uint32_t setsPerPool = 0;
 
-struct DescriptorAllocator {
-
-    struct PoolSizeRatio{
-		VkDescriptorType type;
-		float ratio;
+        void init(std::initializer_list<PoolSizeRatio> _ratios, uint32_t maxSets);
+        VkDescriptorPool create_pool();
+        void clear_pools();
+        void destroy_pools();
+        VkDescriptorSet allocate(VkDescriptorSetLayout layout);
     };
-
-    VkDescriptorPool pool;
-
-    void init_pool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios);
-    void clear_descriptors(VkDevice device);
-    void destroy_pool(VkDevice device);
-
-    VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout);
-};
-
-struct DescriptorAllocatorGrowable {
-public:
-	struct PoolSizeRatio {
-		VkDescriptorType type;
-		float ratio;
-	};
-
-	void init(VkDevice device, uint32_t initialSets, std::span<PoolSizeRatio> poolRatios);
-	void clear_pools(VkDevice device);
-	void destroy_pools(VkDevice device);
-
-    VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout, void* pNext = nullptr);
-private:
-	VkDescriptorPool get_pool(VkDevice device);
-	VkDescriptorPool create_pool(VkDevice device, uint32_t setCount, std::span<PoolSizeRatio> poolRatios);
-
-	std::vector<PoolSizeRatio> ratios;
-	std::vector<VkDescriptorPool> fullPools;
-	std::vector<VkDescriptorPool> readyPools;
-	uint32_t setsPerPool;
-
-};
-
-struct DescriptorWriter {
-    std::deque<VkDescriptorImageInfo> imageInfos;
-    std::deque<VkDescriptorBufferInfo> bufferInfos;
-    std::vector<VkWriteDescriptorSet> writes;
-
-    void write_image(int binding,VkImageView image,VkSampler sampler , VkImageLayout layout, VkDescriptorType type);
-    void write_buffer(int binding,VkBuffer buffer,size_t size, size_t offset,VkDescriptorType type); 
-
-    void clear();
-    void update_set(VkDevice device, VkDescriptorSet set);
-};
+}
