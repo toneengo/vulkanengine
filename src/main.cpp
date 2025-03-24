@@ -22,27 +22,20 @@ struct ComputePushConstants {
 void init_render_data()
 {
     init();
-    VkShaderModule gradient = create_shader_module("assets/shaders/gradient_color.comp");
+    VkShaderModule gradient = create_shader_module("assets/shaders/gradient.comp");
     computeImageDescLayout = create_descriptor_set_layout({
                                  {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}
                              }, VK_SHADER_STAGE_COMPUTE_BIT);
     computeImageDesc = ctx.descriptorAllocator.allocate(computeImageDescLayout);
 
-    VkDescriptorImageInfo imgInfo{};
-    imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imgInfo.imageView = ctx.framebuffer.color[0].imageView;
+    update_descriptor_sets(
+        {
+            {computeImageDesc, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_NULL_HANDLE,
+             ctx.framebuffer.color[0].imageView, VK_IMAGE_LAYOUT_GENERAL}
+        },
+        {}
+    );
 
-    VkWriteDescriptorSet drawImageWrite = {};
-    drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    drawImageWrite.pNext = nullptr;
-
-    drawImageWrite.dstBinding = 0;
-    drawImageWrite.dstSet = computeImageDesc;
-    drawImageWrite.descriptorCount = 1;
-    drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    drawImageWrite.pImageInfo = &imgInfo;
-
-    vkUpdateDescriptorSets(ctx.device, 1, &drawImageWrite, 0, nullptr);
     ComputePipelineBuilder builder;
     computePipeline = builder
         .set_descriptor_set_layouts({computeImageDescLayout})

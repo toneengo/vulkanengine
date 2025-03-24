@@ -412,6 +412,67 @@ void init_glfw_window()
     glfwSetFramebufferSizeCallback(ctx.window, framebuffer_size_callback);
 }
 
+union DescriptorWriteInfo {
+    VkDescriptorBufferInfo bufInfo;
+    VkDescriptorImageInfo imgInfo;
+};
+void engine::update_descriptor_sets(std::initializer_list<ImageWrite> imageWrites, std::initializer_list<BufferWrite> bufferWrites)
+{
+    VkWriteDescriptorSet writeSets[32]; //max 32 writes for now
+    DescriptorWriteInfo writeInfos[32];
+
+    int i = 0;
+    for (auto& w : imageWrites)
+    {
+#ifdef DBG
+        assert(i < 32);
+#endif
+        writeInfos[i].imgInfo.sampler = w.sampler;
+        writeInfos[i].imgInfo.imageView = w.imageView;
+        writeInfos[i].imgInfo.imageLayout = w.imageLayout;
+
+        writeSets[i] = VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = w.descriptorSet,
+            .dstBinding = w.binding,
+            .dstArrayElement = 0, //unused for now
+            .descriptorCount = 1, //unused for now
+            .descriptorType = w.descriptorType,
+            .pImageInfo = &writeInfos[i].imgInfo,
+            .pBufferInfo = nullptr,
+            .pTexelBufferView = nullptr //unused for now
+        };
+
+        i++;
+    }
+    for (auto& w : bufferWrites)
+    {
+#ifdef DBG
+        assert(i < 32);
+#endif
+        writeInfos[i].bufInfo.buffer = w.buffer;
+        writeInfos[i].bufInfo.range = w.range;
+        writeInfos[i].bufInfo.offset = w.offset;
+
+        writeSets[i] = VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = w.descriptorSet,
+            .dstBinding = w.binding,
+            .dstArrayElement = 0, //unused for now
+            .descriptorCount = 1, //unused for now
+            .descriptorType = w.descriptorType,
+            .pImageInfo = nullptr,
+            .pBufferInfo = &writeInfos[i].bufInfo,
+            .pTexelBufferView = nullptr //unused for now
+        };
+
+        i++;
+    }
+    vkUpdateDescriptorSets(ctx.device, i, writeSets, 0, nullptr);
+}
+
 void init_core()
 {
     uint32_t count;

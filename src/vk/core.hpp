@@ -18,6 +18,25 @@ namespace engine
     VkShaderModule create_shader_module(const char* filePath);
     void destroy_shader_module(VkShaderModule module);
 
+    struct ImageWrite {
+        VkDescriptorSet descriptorSet;
+        uint32_t binding;
+        VkDescriptorType descriptorType;
+        VkSampler sampler;
+        VkImageView imageView;
+        VkImageLayout imageLayout;
+    };
+    struct BufferWrite {
+        VkDescriptorSet descriptorSet;
+        uint32_t binding;
+        VkDescriptorType descriptorType;
+        VkBuffer buffer;
+        VkDeviceSize offset;
+        VkDeviceSize range;
+    };
+
+    void update_descriptor_sets(std::initializer_list<ImageWrite> imageWrites, std::initializer_list<BufferWrite> bufferWrites);
+
     void init();
     void cleanup();
     VkDescriptorSetLayout create_descriptor_set_layout(std::initializer_list<Binding> _bindings, VkShaderStageFlags shaderStages, VkDescriptorSetLayoutCreateFlags flags = 0);
