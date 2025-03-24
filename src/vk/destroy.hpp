@@ -35,6 +35,10 @@ namespace engine {
             VkSampler sampler;
         };
         OBJ type;
+#ifdef DBG
+        int lineNumber;
+        const char* fileName;
+#endif
         Object() : type(OBJ::None) {}
         Object(VkImage _im) : image(_im), type(OBJ::Image) {}
         Object(VkImageView _imV) : imageView(_imV), type(OBJ::ImageView) {}

@@ -1,24 +1,30 @@
-#include "core.hpp"
-#include "internal.hpp"
 #include <fstream>
-#include "lib/util.hpp"
-#include "VkBootstrap.h"
-#include "destroy.hpp"
-#include "pipeline_builder.hpp"
+#include <unordered_map>
+#include <fstream>
+#include <set>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-#include <unordered_map>
-#include <fstream>
-#include <set>
 #include "info.hpp"
-#include <glslang/Public/ShaderLang.h>
-#include <glslang/Public/ResourceLimits.h>
-#include <glslang/SPIRV/GlslangToSpv.h>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
+#include <glslang/Public/ShaderLang.h>
+#include <glslang/Public/ResourceLimits.h>
+#include <glslang/SPIRV/GlslangToSpv.h>
+#include "VkBootstrap.h"
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
+
+#include "lib/util.hpp"
+#include "core.hpp"
+#include "internal.hpp"
+#include "destroy.hpp"
+#include "pipeline_builder.hpp"
 
 #ifdef DBG 
     const bool gEnableValidationLayers = true;
@@ -28,10 +34,21 @@
 
 using namespace engine;
 
-static bool gResizeRequested = true;
+static void destroy_swapchain()
+{
+    vkDestroySwapchainKHR(ctx.device, ctx.swapchain.swapchain, nullptr);
+    for (const auto& iv : ctx.swapchain.imageViews)
+    {
+        vkDestroyImageView(ctx.device, iv, nullptr);
+    }
+}
+
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-    gResizeRequested = true;
+    ctx.windowExtent.width = width;
+    ctx.windowExtent.height = height;
+    destroy_swapchain();
+    create_swapchain(width, height);
 }
 
 void error_exit()
@@ -121,13 +138,16 @@ void engine::blit(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D srcS
 
 void engine::Object::destroy()
 {
+#ifdef DBG
+    printf("Destroying object at %s:%d\n", fileName, lineNumber);
+#endif
     switch (type)
     {
         case OBJ::Image:
             vmaDestroyImage(ctx.allocator, image, ctx.imageAllocations[image]);
             break;
         case OBJ::ImageView:
-            vmaDestroyImage(ctx.allocator, image, ctx.imageAllocations[image]);
+            vkDestroyImageView(ctx.device, imageView, nullptr);
             break;
         case OBJ::Allocator:
             vmaDestroyAllocator(ctx.allocator);
@@ -161,10 +181,11 @@ void engine::Object::destroy()
     }
 }
 
-void engine::DestroyQueue::push(Object obj)
+inline void engine::DestroyQueue::push(Object obj)
 {
     queue.push_back(obj);
 }
+
 void engine::DestroyQueue::flush()
 {
     for (auto it = queue.rbegin(); it != queue.rend(); it++)
@@ -174,7 +195,53 @@ void engine::DestroyQueue::flush()
     queue.clear();
 }
 
-DestroyQueue destroyQueue;
+void init_imgui()
+{
+    // this initializes the core structures of imgui
+    VkDescriptorPoolSize pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE },
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = 0;
+
+    for (VkDescriptorPoolSize& pool_size : pool_sizes)
+        pool_info.maxSets += pool_size.descriptorCount;
+
+    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.pPoolSizes = pool_sizes;
+
+    VkDescriptorPool imguiPool;
+    VK_CHECK(vkCreateDescriptorPool(ctx.device, &pool_info, nullptr, &imguiPool));
+
+	ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(ctx.window, true);
+
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion = VK_API_VERSION_1_3;              // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
+    init_info.Instance = ctx.instance;
+    init_info.PhysicalDevice = ctx.physicalDevice;
+    init_info.Device = ctx.device;
+    init_info.QueueFamily = ctx.graphicsQueueFamily;
+    init_info.Queue = ctx.graphicsQueue;
+    init_info.PipelineCache = VK_NULL_HANDLE;
+    init_info.DescriptorPool = imguiPool;
+    init_info.UseDynamicRendering = true;
+    init_info.MinImageCount = 3;
+    init_info.ImageCount = 3;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    //dynamic rendering parameters for imgui to use
+	init_info.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+	init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+	init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &ctx.swapchain.imageFormat;
+    ImGui_ImplVulkan_Init(&init_info);
+    ImGui_ImplVulkan_CreateFontsTexture();
+
+    QUEUE_OBJ_DESTROY(imguiPool);
+}
 
 //Shaders
 //from glslang repo
@@ -335,11 +402,12 @@ VkDescriptorSetLayout engine::create_descriptor_set_layout(std::initializer_list
 
     VkDescriptorSetLayout set;
     VK_CHECK(vkCreateDescriptorSetLayout(ctx.device, &info, nullptr, &set));
-    destroyQueue.push(set);
+    QUEUE_OBJ_DESTROY(set);
 
     return set;
 }
 
+std::vector<VkShaderModule> shaderModulesToClean;
 
 VkShaderModule engine::create_shader_module(const char* filePath)
 {
@@ -355,7 +423,7 @@ VkShaderModule engine::create_shader_module(const char* filePath)
 
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
-        fmt::printf("Couldn't open file %s\n", filePath);
+        printf("Couldn't open file %s\n", filePath);
         error_exit();
         //return false;
     }
@@ -385,8 +453,18 @@ VkShaderModule engine::create_shader_module(const char* filePath)
     if (vkCreateShaderModule(ctx.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         error_exit();
     }
+    shaderModulesToClean.push_back(shaderModule);
 
     return shaderModule;
+}
+
+void engine::clean_shader_modules()
+{
+    for (const auto& s : shaderModulesToClean)
+    {
+        vkDestroyShaderModule(ctx.device, s, nullptr);
+    }
+    shaderModulesToClean.clear();
 }
 
 void engine::destroy_shader_module(VkShaderModule module)
@@ -530,7 +608,7 @@ void init_core()
     allocatorInfo.instance = ctx.instance;
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &ctx.allocator);
-    destroyQueue.push(ctx.allocator);
+    QUEUE_OBJ_DESTROY(ctx.allocator);
 
     //initialize swapchain
     create_swapchain(ctx.windowExtent.width, ctx.windowExtent.height);
@@ -542,11 +620,11 @@ void init_core()
 
     for (const auto& image : ctx.framebuffer.color)
     {
-        destroyQueue.push(image.image);
-        destroyQueue.push(image.imageView);
+        QUEUE_OBJ_DESTROY(image.image);
+        QUEUE_OBJ_DESTROY(image.imageView);
     }
-    destroyQueue.push(ctx.framebuffer.depth.image);
-    destroyQueue.push(ctx.framebuffer.depth.imageView);
+    QUEUE_OBJ_DESTROY(ctx.framebuffer.depth.image);
+    QUEUE_OBJ_DESTROY(ctx.framebuffer.depth.imageView);
 
 	//create frame command pools
     auto commandPoolInfo = info::create::command_pool(ctx.graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -559,7 +637,7 @@ void init_core()
     VK_CHECK(vkCreateCommandPool(ctx.device, &commandPoolInfo, nullptr, &ctx.immCommandPool));
 	VkCommandBufferAllocateInfo cmdAllocInfo = info::allocate::command_buffer(ctx.immCommandPool, 1);
 	VK_CHECK(vkAllocateCommandBuffers(ctx.device, &cmdAllocInfo, &ctx.immCommandBuffer));
-    destroyQueue.push(ctx.immCommandPool);
+    QUEUE_OBJ_DESTROY(ctx.immCommandPool);
 
     //create synchronization structures
     VkFenceCreateInfo fence = info::create::fence(VK_FENCE_CREATE_SIGNALED_BIT);
@@ -571,7 +649,7 @@ void init_core()
 		VK_CHECK(vkCreateSemaphore(ctx.device, &semaphore, nullptr, &ctx.frames[i].renderSemaphore));
 	}
     VK_CHECK(vkCreateFence(ctx.device, &fence, nullptr, &ctx.immCommandFence));
-    destroyQueue.push(ctx.immCommandFence);
+    QUEUE_OBJ_DESTROY(ctx.immCommandFence);
 
     //add
     //ctx.framebuffer.colorAttachments[0].descriptorSetLayout = create_descriptor_set_layout({ { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE } }, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -595,6 +673,13 @@ void engine::init()
 {
     init_glfw_window();
     init_core();
+    init_imgui();
+    ctx.initialised = true;
+}
+
+void engine::clean_init()
+{
+    clean_shader_modules();
 }
 
 void engine::begin_immediate_command()
@@ -639,6 +724,7 @@ Buffer engine::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemo
 	vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	Buffer buffer;
 	VK_CHECK(vmaCreateBuffer(ctx.allocator, &bufferInfo, &vmaallocInfo, &buffer.buffer, &buffer.allocation, &buffer.info));
+    ctx.bufferAllocations[buffer.buffer] = buffer.allocation;
 	return buffer;
 }
 
@@ -714,7 +800,7 @@ Image engine::create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags u
 	return newImage;
 }
 
-VkPipeline create_default_graphics_pipeline(const char* vertPath, const char* fragPath)
+VkPipeline engine::create_default_graphics_pipeline(const char* vertPath, const char* fragPath)
 {
     GraphicsPipelineBuilder builder;
     return builder
@@ -755,18 +841,54 @@ void engine::create_swapchain(uint32_t width, uint32_t height)
 	ctx.swapchain.imageViews = vkbSwapchain.get_image_views().value();
 }
 
-//VkPipeline create_default_compute_pipeline(const char* compPath)
-//{
-//};
-
-void destroy_swapchain()
+GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
 {
-    vkDestroySwapchainKHR(ctx.device, ctx.swapchain.swapchain, nullptr);
+	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-	// destroy swapchain resources
-	for (auto& siv : ctx.swapchain.imageViews) {
-		vkDestroyImageView(ctx.device, siv, nullptr);
-	}
+	GPUMeshBuffers newSurface;
+
+	//create vertex buffer
+	newSurface.vertexBuffer = create_buffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY);
+
+	//find the adress of the vertex buffer
+	VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = newSurface.vertexBuffer.buffer };
+	newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(ctx.device, &deviceAddressInfo);
+
+	//create index buffer
+	newSurface.indexBuffer = create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY);
+    Buffer staging = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+	void* data = staging.allocation->GetMappedData();
+
+	// copy vertex buffer
+	memcpy(data, vertices.data(), vertexBufferSize);
+	// copy index buffer
+	memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+
+	{
+        ImmediateCommandGuard _{};
+		VkBufferCopy vertexCopy{ 0 };
+		vertexCopy.dstOffset = 0;
+		vertexCopy.srcOffset = 0;
+		vertexCopy.size = vertexBufferSize;
+
+		vkCmdCopyBuffer(ctx.immCommandBuffer, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
+
+		VkBufferCopy indexCopy{ 0 };
+		indexCopy.dstOffset = 0;
+		indexCopy.srcOffset = vertexBufferSize;
+		indexCopy.size = indexBufferSize;
+
+		vkCmdCopyBuffer(ctx.immCommandBuffer, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+    }
+
+    destroy_buffer(staging);
+    QUEUE_OBJ_DESTROY(newSurface.indexBuffer.buffer);
+    QUEUE_OBJ_DESTROY(newSurface.vertexBuffer.buffer);
+	return newSurface;
 }
 
 void engine::cleanup()
@@ -788,6 +910,7 @@ void engine::cleanup()
         ctx.frames[i].destroyQueue.flush();
     }
 
+    ImGui_ImplVulkan_Shutdown();
     destroyQueue.flush();
 
     ctx.descriptorAllocator.destroy_pools();
@@ -800,4 +923,9 @@ void engine::cleanup()
     vkDestroyInstance(ctx.instance, nullptr);
     glfwDestroyWindow(ctx.window);
     glfwTerminate();
+}
+
+void engine::destroy_buffer(Buffer buffer)
+{
+    vmaDestroyBuffer(ctx.allocator, buffer.buffer, buffer.allocation);
 }

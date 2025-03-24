@@ -53,6 +53,8 @@ namespace engine {
         VkExtent2D windowExtent;
         VkExtent3D screenExtent; //desktop resolution
         float renderScale = 1.f;
+
+        VkExtent2D extent; //framebufufer size
      
         struct Swapchain
         {
@@ -71,4 +73,16 @@ namespace engine {
     inline FrameContext& get_frame() {
         return ctx.frames[ctx.frameIdx % FRAME_OVERLAP];
     }
+    inline DestroyQueue destroyQueue;
+#ifdef DBG
+#define QUEUE_OBJ_DESTROY(x) do {\
+        engine::Object o(x);\
+        o.lineNumber = __LINE__;\
+        o.fileName = __FILE__;\
+        engine::destroyQueue.push(o);\
+    } while(0)
+#else
+#define QUEUE_OBJ_DESTROY(x) destroyQueue.push(x);
+#endif
+
 }

@@ -25,9 +25,15 @@ VkPipelineColorBlendAttachmentState color_blend()
     return state;
 }
 
-GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_layout(VkPipelineLayout _layout)
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_descriptor_set_layouts(std::initializer_list<VkDescriptorSetLayout> dsLayouts)
 {
-    layout = _layout;
+    descriptorSetLayouts = dsLayouts;
+    return *this;
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_push_constant_ranges(std::initializer_list<VkPushConstantRange> ranges)
+{
+    pushConstantRanges = ranges;
     return *this;
 }
 
@@ -168,6 +174,15 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_dynamic_states(std::initia
 
 VkPipeline GraphicsPipelineBuilder::build()
 {
+    VkPipelineLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutInfo.pNext = nullptr;
+	layoutInfo.pSetLayouts = descriptorSetLayouts.data();
+	layoutInfo.setLayoutCount = descriptorSetLayouts.size();
+    layoutInfo.pPushConstantRanges = pushConstantRanges.data();
+    layoutInfo.pushConstantRangeCount = pushConstantRanges.size();
+	VK_CHECK(vkCreatePipelineLayout(engine::ctx.device, &layoutInfo, nullptr, &layout));
+
     VkGraphicsPipelineCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     std::vector<VkFormat> colorAttachmentFormats;
@@ -223,6 +238,8 @@ VkPipeline GraphicsPipelineBuilder::build()
         abort();
     }
 
+    QUEUE_OBJ_DESTROY(pipeline);
+    QUEUE_OBJ_DESTROY(layout);
     return pipeline;
 }
 
@@ -269,5 +286,8 @@ VkPipeline ComputePipelineBuilder::build()
 	computePipelineCreateInfo.stage = stageInfo;
 
 	VK_CHECK(vkCreateComputePipelines(engine::ctx.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pipeline));
+    
+    QUEUE_OBJ_DESTROY(pipeline);
+    QUEUE_OBJ_DESTROY(layout);
     return pipeline;
 }

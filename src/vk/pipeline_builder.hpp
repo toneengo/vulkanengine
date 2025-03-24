@@ -22,8 +22,23 @@ struct Blend
 VkPipelineColorBlendAttachmentState color_blend(Blend color, Blend alpha);
 VkPipelineColorBlendAttachmentState color_blend(); //disabled color blend
 
+//#TODO: maake it a inheritable class but who cares about that rn
+struct ComputePipelineBuilder {
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    std::vector<VkPushConstantRange> pushConstantRanges;
+    VkShaderModule shaderModule;
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    ComputePipelineBuilder& set_shader_module(VkShaderModule module);
+    ComputePipelineBuilder& set_descriptor_set_layouts(std::initializer_list<VkDescriptorSetLayout> dsLayouts);
+    ComputePipelineBuilder& set_push_constant_ranges(std::initializer_list<VkPushConstantRange> ranges);
+    VkPipeline build();
+};
+
 // VkGraphicsPipelineCreateInfo proxy
 struct GraphicsPipelineBuilder {
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+    std::vector<VkPushConstantRange> pushConstantRanges;
     engine::Framebuffer                              framebuffer;
     VkPipelineCreateFlags                            flags = 0;
     std::vector<VkPipelineShaderStageCreateInfo>     stages;
@@ -47,7 +62,8 @@ struct GraphicsPipelineBuilder {
     */
 
     
-    GraphicsPipelineBuilder& set_layout(VkPipelineLayout layout);
+    GraphicsPipelineBuilder& set_descriptor_set_layouts(std::initializer_list<VkDescriptorSetLayout> dsLayouts);
+    GraphicsPipelineBuilder& set_push_constant_ranges(std::initializer_list<VkPushConstantRange> ranges);
     GraphicsPipelineBuilder& set_framebuffer(engine::Framebuffer framebuffer);
     GraphicsPipelineBuilder& set_shader_stages(std::initializer_list<ShaderStage> shaderStages);
     GraphicsPipelineBuilder& set_viewport_state(uint32_t viewportCount = 1, uint32_t scissorCount = 1, VkViewport* viewports = VK_NULL_HANDLE, VkRect2D* scissors = VK_NULL_HANDLE);
@@ -71,14 +87,4 @@ struct GraphicsPipelineBuilder {
     VkPipeline build();
 };
 
-struct ComputePipelineBuilder {
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-    std::vector<VkPushConstantRange> pushConstantRanges;
-    VkShaderModule shaderModule;
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-    ComputePipelineBuilder& set_shader_module(VkShaderModule module);
-    ComputePipelineBuilder& set_descriptor_set_layouts(std::initializer_list<VkDescriptorSetLayout> dsLayouts);
-    ComputePipelineBuilder& set_push_constant_ranges(std::initializer_list<VkPushConstantRange> ranges);
-    VkPipeline build();
-};
+

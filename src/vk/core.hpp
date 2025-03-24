@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_core.h>
 #include "vk_mem_alloc.h"
 #include "types.hpp"
+#include <unordered_map>
 
 namespace engine
 {
@@ -16,7 +17,11 @@ namespace engine
 
     void blit(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize);
     VkShaderModule create_shader_module(const char* filePath);
+
+    void clean_init();
+    void clean_shader_modules();
     void destroy_shader_module(VkShaderModule module);
+    void load_gltf_meshes(const char* filePath, std::unordered_map<std::string, MeshAsset>& meshes);
 
     struct ImageWrite {
         VkDescriptorSet descriptorSet;
