@@ -1,5 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
+#include "types.hpp"
 #include "vk_mem_alloc.h"
 namespace engine {
     //general object struct, allows for putting any type of object into one array
@@ -34,13 +35,14 @@ namespace engine {
             VkBuffer buffer;
             VkSampler sampler;
         };
+        VmaAllocation allocation;
         OBJ type;
 #ifdef DBG
-        int lineNumber;
+        int lineNumber = -1;
         const char* fileName;
 #endif
         Object() : type(OBJ::None) {}
-        Object(VkImage _im) : image(_im), type(OBJ::Image) {}
+        Object(engine::Image _im) : image(_im.image), allocation(_im.allocation), type(OBJ::Image) {}
         Object(VkImageView _imV) : imageView(_imV), type(OBJ::ImageView) {}
         Object(VmaAllocator _allocator) : type(OBJ::Allocator) {}
         Object(VkDescriptorPool _dp) : dp(_dp), type(OBJ::DescriptorPool) {}
@@ -49,7 +51,7 @@ namespace engine {
         Object(VkPipeline _pl) : pl(_pl), type(OBJ::Pipeline) {}
         Object(VkFence _fence) : fence(_fence), type(OBJ::Fence) {}
         Object(VkCommandPool _commandPool) : commandPool(_commandPool), type(OBJ::CommandPool) {}
-        Object(VkBuffer _buffer) : buffer(_buffer), type(OBJ::Buffer) {}
+        Object(engine::Buffer _buffer) : buffer(_buffer.buffer), allocation(_buffer.allocation), type(OBJ::Buffer) {}
         Object(VkSampler _sampler) : sampler(_sampler), type(OBJ::Sampler) {}
 
         void destroy();

@@ -34,8 +34,6 @@ namespace engine {
         VkQueue graphicsQueue;
         uint32_t graphicsQueueFamily;
         VmaAllocator allocator;
-        std::unordered_map<VkImage, VmaAllocation> imageAllocations;
-        std::unordered_map<VkBuffer, VmaAllocation> bufferAllocations;
 
         FrameContext frames[FRAME_OVERLAP];
 

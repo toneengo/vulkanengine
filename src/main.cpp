@@ -13,6 +13,7 @@
 #include "vk/info.hpp"
 
 VkDescriptorSetLayout computeImageDescLayout;
+VkDescriptorSetLayout uniformDescLayout;
 VkDescriptorSet computeImageDesc;
 VkPipeline computePipeline;
 VkPipeline vertexPipeline;
@@ -35,6 +36,68 @@ struct VertexPushConstants {
     VkDeviceAddress vertexBuffer;
 };
 
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
+GPUSceneData camera = {};
+
+struct Input {
+    bool forward = false;
+    bool backward = false;
+    bool left = false;
+    bool right = false;
+    bool up = false;
+    bool down = false;
+} input;
+
+float speed = 0.1;
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+        input.forward = true;
+    else if (key == GLFW_KEY_W && action == GLFW_RELEASE)
+        input.forward = false;
+
+    if (key == GLFW_KEY_A && action == GLFW_PRESS)
+        input.left = true;
+    else if (key == GLFW_KEY_A && action == GLFW_RELEASE)
+        input.left = false;
+
+    if (key == GLFW_KEY_S && action == GLFW_PRESS)
+        input.backward = true;
+    else if (key == GLFW_KEY_S && action == GLFW_RELEASE)
+        input.backward = false;
+
+    if (key == GLFW_KEY_D && action == GLFW_PRESS)
+        input.right = true;
+    else if (key == GLFW_KEY_D && action == GLFW_RELEASE)
+        input.right = false;
+
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        input.up = true;
+    else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE)
+        input.up = false;
+
+    if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_PRESS)
+        input.down = true;
+    else if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_RELEASE)
+        input.down = false;
+
+}
+
+void update_camera()
+{
+    float h = ((input.forward || input.backward) && (input.left || input.right)) ? sqrt(speed*speed / 2.f) : speed;
+    float vertical = 0 + input.down * h - input.up * h;
+    float horizontal = 0 + input.left * h - input.right * h;
+    float depth = 0 + input.forward * h - input.backward * h;
+    
+    camera.view = glm::translate(camera.view, glm::vec3(horizontal,vertical,depth));
+}
+
 void init_render_data()
 {
     init();
@@ -42,6 +105,9 @@ void init_render_data()
     computeImageDescLayout = create_descriptor_set_layout({
                                  {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}
                              }, VK_SHADER_STAGE_COMPUTE_BIT);
+    uniformDescLayout = create_descriptor_set_layout({
+                                 {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}
+                             }, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     computeImageDesc = ctx.descriptorAllocator.allocate(computeImageDescLayout);
 
     update_descriptor_sets(
@@ -65,6 +131,7 @@ void init_render_data()
     {
         GraphicsPipelineBuilder builder;
         vertexPipeline = builder
+            .set_descriptor_set_layouts({uniformDescLayout})
             .set_push_constant_ranges({ { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VertexPushConstants) } })
             .set_framebuffer(ctx.framebuffer)
             .set_shader_stages({
@@ -123,7 +190,7 @@ void draw_background()
 
 void draw_geometry()
 {
-    const auto& frame = get_frame();
+    auto& frame = get_frame();
     const VkCommandBuffer cmd = frame.commandBuffer;
 
     VkRenderingAttachmentInfo colorAttachment = info::color_attachment(ctx.framebuffer.color[0].imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -153,17 +220,28 @@ void draw_geometry()
 
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
     //vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vertexPipelineLayout, 0, 1, &imageSet, 0, nullptr);
+    Buffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    frame.destroyQueue.push(gpuSceneDataBuffer);
 
-	glm::mat4 view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, translate_z });
-	// camera projection
-	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)ctx.extent.width / (float)ctx.extent.height, 0.1f, 10000.f);
+    //write the buffer
+	GPUSceneData* sceneUniformData = (GPUSceneData*)get_mapped_data(gpuSceneDataBuffer.allocation);
+	*sceneUniformData = camera;
 
-	// invert the Y direction on projection matrix so that we are more similar
-	// to opengl and gltf axis
-	projection[1][1] *= -1;
+	//create a descriptor set that binds that buffer and update it
+	VkDescriptorSet globalDescriptor = frame.descriptorAllocator.allocate(uniformDescLayout);
 
+    update_descriptor_sets(
+        {},
+        {
+            {globalDescriptor, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+             gpuSceneDataBuffer.buffer, 0, sizeof(GPUSceneData)}
+        }
+    );
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vertexPipelineLayout, 0,1, &globalDescriptor,0,nullptr );
+	
 	VertexPushConstants push_constants;
-	push_constants.worldMatrix = projection * view;
+	//push_constants.worldMatrix = projection * view;
     MeshAsset& mesh = meshes["Suzanne"];
 	push_constants.vertexBuffer = mesh.meshBuffers.vertexBufferAddress;
 
@@ -202,6 +280,12 @@ void render()
     image_barrier(cmd, ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     image_barrier(cmd, ctx.framebuffer.depth.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
+	// camera projection
+    camera.proj = glm::perspective(glm::radians(70.f), (float)ctx.extent.width / (float)ctx.extent.height, 0.1f, 10000.f);
+	// invert the Y direction on projection matrix so that we are more similar
+	// to opengl and gltf axis
+	camera.proj[1][1] *= -1;
+    update_camera();
     draw_geometry();
     
     image_barrier(cmd, ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -238,7 +322,10 @@ void render()
 
 int main()
 {
+    camera.view = glm::translate(glm::mat4(1.f), glm::vec3{ 0, 0, -5 });
     init_render_data();
+
+    glfwSetKeyCallback(ctx.window, key_callback);
 
     while (!glfwWindowShouldClose(ctx.window))
     {

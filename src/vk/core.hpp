@@ -69,6 +69,7 @@ namespace engine
     void begin_immediate_command();
     void end_immediate_command();
 
+    void* get_mapped_data(VmaAllocation a);
     //raii version of above commands
     struct ImmediateCommandGuard
     {

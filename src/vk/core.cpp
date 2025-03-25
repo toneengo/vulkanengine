@@ -1,5 +1,4 @@
 #include <fstream>
-#include <unordered_map>
 #include <fstream>
 #include <set>
 
@@ -139,12 +138,12 @@ void engine::blit(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D srcS
 void engine::Object::destroy()
 {
 #ifdef DBG
-    printf("Destroying object at %s:%d\n", fileName, lineNumber);
+    if (lineNumber != -1) printf("Destroying object at %s:%d\n", fileName, lineNumber);
 #endif
     switch (type)
     {
         case OBJ::Image:
-            vmaDestroyImage(ctx.allocator, image, ctx.imageAllocations[image]);
+            vmaDestroyImage(ctx.allocator, image, allocation);
             break;
         case OBJ::ImageView:
             vkDestroyImageView(ctx.device, imageView, nullptr);
@@ -171,7 +170,7 @@ void engine::Object::destroy()
             vkDestroyCommandPool(ctx.device, commandPool, nullptr);
             break;
         case OBJ::Buffer:
-            vmaDestroyBuffer(ctx.allocator, buffer, ctx.bufferAllocations[buffer]);
+            vmaDestroyBuffer(ctx.allocator, buffer, allocation);
             break;
         case OBJ::Sampler:
             vkDestroySampler(ctx.device, sampler, nullptr);
@@ -620,10 +619,10 @@ void init_core()
 
     for (const auto& image : ctx.framebuffer.color)
     {
-        QUEUE_OBJ_DESTROY(image.image);
+        QUEUE_OBJ_DESTROY(image);
         QUEUE_OBJ_DESTROY(image.imageView);
     }
-    QUEUE_OBJ_DESTROY(ctx.framebuffer.depth.image);
+    QUEUE_OBJ_DESTROY(ctx.framebuffer.depth);
     QUEUE_OBJ_DESTROY(ctx.framebuffer.depth.imageView);
 
 	//create frame command pools
@@ -724,7 +723,6 @@ Buffer engine::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemo
 	vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	Buffer buffer;
 	VK_CHECK(vmaCreateBuffer(ctx.allocator, &bufferInfo, &vmaallocInfo, &buffer.buffer, &buffer.allocation, &buffer.info));
-    ctx.bufferAllocations[buffer.buffer] = buffer.allocation;
 	return buffer;
 }
 
@@ -782,7 +780,6 @@ Image engine::create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags u
 	allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	VK_CHECK(vmaCreateImage(ctx.allocator, &img_info, &allocinfo, &newImage.image, &newImage.allocation, nullptr));
-    ctx.imageAllocations[newImage.image] = newImage.allocation;
 
 	// if the format is a depth format, we will need to have it use the correct
 	// aspect flag
@@ -886,8 +883,8 @@ GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertic
     }
 
     destroy_buffer(staging);
-    QUEUE_OBJ_DESTROY(newSurface.indexBuffer.buffer);
-    QUEUE_OBJ_DESTROY(newSurface.vertexBuffer.buffer);
+    QUEUE_OBJ_DESTROY(newSurface.indexBuffer);
+    QUEUE_OBJ_DESTROY(newSurface.vertexBuffer);
 	return newSurface;
 }
 
@@ -928,4 +925,9 @@ void engine::cleanup()
 void engine::destroy_buffer(Buffer buffer)
 {
     vmaDestroyBuffer(ctx.allocator, buffer.buffer, buffer.allocation);
+}
+
+void* engine::get_mapped_data(VmaAllocation a)
+{
+    return a->GetMappedData();
 }
