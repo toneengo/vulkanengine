@@ -24,7 +24,7 @@ VkDescriptorPool DescriptorAllocator::create_pool()
 
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = 0;
+    pool_info.flags = flags;
     pool_info.maxSets = setsPerPool;
     pool_info.poolSizeCount = (uint32_t)poolSizes.size();
     pool_info.pPoolSizes = poolSizes.data();
@@ -49,6 +49,11 @@ void DescriptorAllocator::destroy_pools()
         vkDestroyDescriptorPool(ctx.device, p, nullptr);
     }
     currentPool = 0;
+}
+
+void DescriptorAllocator::set_flags(VkDescriptorPoolCreateFlags _flags)
+{
+    flags = _flags;
 }
 
 VkDescriptorSet DescriptorAllocator::allocate(VkDescriptorSetLayout layout)

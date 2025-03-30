@@ -1,6 +1,8 @@
 #include <fstream>
 #include <fstream>
 #include <set>
+#include <vulkan/vulkan_core.h>
+#include <span>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -14,6 +16,9 @@
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 #include "VkBootstrap.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -239,7 +244,7 @@ void init_imgui()
     ImGui_ImplVulkan_Init(&init_info);
     ImGui_ImplVulkan_CreateFontsTexture();
 
-    QUEUE_OBJ_DESTROY(imguiPool);
+    QUEUE_DESTROY_OBJ(imguiPool);
 }
 
 //Shaders
@@ -362,7 +367,7 @@ static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shad
     {
         puts(shader.getInfoLog());
         puts(shader.getInfoDebugLog());
-        error_exit();
+        return {};
     }
 
     const char* const* ptr;
@@ -401,7 +406,7 @@ VkDescriptorSetLayout engine::create_descriptor_set_layout(std::initializer_list
 
     VkDescriptorSetLayout set;
     VK_CHECK(vkCreateDescriptorSetLayout(ctx.device, &info, nullptr, &set));
-    QUEUE_OBJ_DESTROY(set);
+    QUEUE_DESTROY_OBJ(set);
 
     return set;
 }
@@ -438,6 +443,10 @@ VkShaderModule engine::create_shader_module(const char* filePath)
     file.close();
 
     auto spirv = compileShaderToSPIRV_Vulkan(&buf, stage);
+    if (spirv.size() == 0) {
+        printf("Error compiling %s\n", filePath);
+        error_exit();
+    }
     delete [] buf;
 
     // create a new shader module, using the buffer we loaded
@@ -513,7 +522,7 @@ void engine::update_descriptor_sets(std::initializer_list<ImageWrite> imageWrite
             .pNext = nullptr,
             .dstSet = w.descriptorSet,
             .dstBinding = w.binding,
-            .dstArrayElement = 0, //unused for now
+            .dstArrayElement = w.index,
             .descriptorCount = 1, //unused for now
             .descriptorType = w.descriptorType,
             .pImageInfo = &writeInfos[i].imgInfo,
@@ -584,6 +593,13 @@ void init_core()
 	VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
 	features12.bufferDeviceAddress = true;
 	features12.descriptorIndexing = true;
+	features12.runtimeDescriptorArray = true;
+	features12.shaderUniformBufferArrayNonUniformIndexing = true;
+	features12.shaderStorageImageArrayNonUniformIndexing = true;
+	features12.shaderStorageImageArrayNonUniformIndexing = true;
+	features12.descriptorBindingSampledImageUpdateAfterBind = true;
+	features12.descriptorBindingStorageBufferUpdateAfterBind = true;
+	features12.descriptorBindingStorageImageUpdateAfterBind = true;
 
 	vkb::PhysicalDeviceSelector selector{ vkb_inst };
 	vkb::PhysicalDevice physical_device = selector
@@ -607,7 +623,7 @@ void init_core()
     allocatorInfo.instance = ctx.instance;
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &ctx.allocator);
-    QUEUE_OBJ_DESTROY(ctx.allocator);
+    QUEUE_DESTROY_OBJ(ctx.allocator);
 
     //initialize swapchain
     create_swapchain(ctx.windowExtent.width, ctx.windowExtent.height);
@@ -619,11 +635,11 @@ void init_core()
 
     for (const auto& image : ctx.framebuffer.color)
     {
-        QUEUE_OBJ_DESTROY(image);
-        QUEUE_OBJ_DESTROY(image.imageView);
+        QUEUE_DESTROY_OBJ(image);
+        QUEUE_DESTROY_OBJ(image.imageView);
     }
-    QUEUE_OBJ_DESTROY(ctx.framebuffer.depth);
-    QUEUE_OBJ_DESTROY(ctx.framebuffer.depth.imageView);
+    QUEUE_DESTROY_OBJ(ctx.framebuffer.depth);
+    QUEUE_DESTROY_OBJ(ctx.framebuffer.depth.imageView);
 
 	//create frame command pools
     auto commandPoolInfo = info::create::command_pool(ctx.graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -636,7 +652,7 @@ void init_core()
     VK_CHECK(vkCreateCommandPool(ctx.device, &commandPoolInfo, nullptr, &ctx.immCommandPool));
 	VkCommandBufferAllocateInfo cmdAllocInfo = info::allocate::command_buffer(ctx.immCommandPool, 1);
 	VK_CHECK(vkAllocateCommandBuffers(ctx.device, &cmdAllocInfo, &ctx.immCommandBuffer));
-    QUEUE_OBJ_DESTROY(ctx.immCommandPool);
+    QUEUE_DESTROY_OBJ(ctx.immCommandPool);
 
     //create synchronization structures
     VkFenceCreateInfo fence = info::create::fence(VK_FENCE_CREATE_SIGNALED_BIT);
@@ -648,16 +664,18 @@ void init_core()
 		VK_CHECK(vkCreateSemaphore(ctx.device, &semaphore, nullptr, &ctx.frames[i].renderSemaphore));
 	}
     VK_CHECK(vkCreateFence(ctx.device, &fence, nullptr, &ctx.immCommandFence));
-    QUEUE_OBJ_DESTROY(ctx.immCommandFence);
+    QUEUE_DESTROY_OBJ(ctx.immCommandFence);
 
     //add
     //ctx.framebuffer.colorAttachments[0].descriptorSetLayout = create_descriptor_set_layout({ { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE } }, VK_SHADER_STAGE_COMPUTE_BIT);
     //ctx.framebuffer.depthAttachment.descriptorSetLayout = create_descriptor_set_layout({ { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER } }, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     //initialise descriptor allocators
+    ctx.descriptorAllocator.set_flags(VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
     ctx.descriptorAllocator.init({
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }}, 10);
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, IMAGE_COUNT },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SAMPLER_COUNT },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_COUNT }}, 1);
     for (int i = 0; i < FRAME_OVERLAP; i++)
     {
         ctx.frames[i].descriptorAllocator.init({
@@ -666,6 +684,27 @@ void init_core()
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 }}, 1000);
     }
+
+    samplerDescriptorSetLayout = create_descriptor_set_layout(
+        {{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SAMPLER_COUNT,
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT}},
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT);
+
+    samplerDescriptorSet = ctx.descriptorAllocator.allocate(samplerDescriptorSetLayout);
+
+    //create samplers
+    VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+	sampl.magFilter = VK_FILTER_NEAREST;
+	sampl.minFilter = VK_FILTER_NEAREST;
+	vkCreateSampler(ctx.device, &sampl, nullptr, &nearestSampler);
+
+	sampl.magFilter = VK_FILTER_LINEAR;
+	sampl.minFilter = VK_FILTER_LINEAR;
+	vkCreateSampler(ctx.device, &sampl, nullptr, &linearSampler);
+
+    QUEUE_DESTROY_OBJ(linearSampler);
+    QUEUE_DESTROY_OBJ(nearestSampler);
 }
 
 void engine::init()
@@ -761,6 +800,30 @@ Image engine::create_image(void* data, VkExtent3D size, VkFormat format, VkImage
     vmaDestroyBuffer(ctx.allocator, uploadbuffer.buffer, uploadbuffer.allocation);
 
 	return new_image;
+}
+
+int textureID = 0;
+Image engine::create_texture(const char* fileName, VkImageUsageFlags usage, bool mipmapped)
+{
+    VkExtent3D extent {};
+    int width, height;
+    unsigned char *pixels = stbi_load(fileName, &width, &height, nullptr, 4);
+    extent.width = width;
+    extent.height = height;
+    extent.depth = 1;
+
+    auto image = create_image(pixels, extent, VK_FORMAT_R8G8B8A8_UNORM, usage, mipmapped);
+    stbi_image_free(pixels);
+
+    image.index = textureID++;
+    update_descriptor_sets(
+        {{samplerDescriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linearSampler,
+            image.imageView, VK_IMAGE_LAYOUT_GENERAL, image.index}},
+        {});
+
+    destroyQueue.push(image);
+    destroyQueue.push(image.imageView);
+    return image;
 }
 
 Image engine::create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
@@ -883,8 +946,9 @@ GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertic
     }
 
     destroy_buffer(staging);
-    QUEUE_OBJ_DESTROY(newSurface.indexBuffer);
-    QUEUE_OBJ_DESTROY(newSurface.vertexBuffer);
+    //we doont want to print here
+    destroyQueue.push(newSurface.indexBuffer);
+    destroyQueue.push(newSurface.vertexBuffer);
 	return newSurface;
 }
 

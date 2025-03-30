@@ -1,9 +1,9 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 #include "vk_mem_alloc.h"
 #include "types.hpp"
 #include <unordered_map>
+#include <string>
 
 namespace engine
 {
@@ -21,7 +21,7 @@ namespace engine
     void clean_init();
     void clean_shader_modules();
     void destroy_shader_module(VkShaderModule module);
-    void load_gltf_meshes(const char* filePath, std::unordered_map<std::string, MeshAsset>& meshes);
+    Model load_gltf_model(const char* filePath);
 
     struct ImageWrite {
         VkDescriptorSet descriptorSet;
@@ -30,6 +30,7 @@ namespace engine
         VkSampler sampler;
         VkImageView imageView;
         VkImageLayout imageLayout;
+        uint32_t index = 0;
     };
     struct BufferWrite {
         VkDescriptorSet descriptorSet;
@@ -48,6 +49,7 @@ namespace engine
     Image create_image_from_pixels(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     Image create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     Image create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    Image create_texture(const char* fileName, VkImageUsageFlags usage, bool mipmapped = false);
     Buffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void create_swapchain(uint32_t width, uint32_t height);
 

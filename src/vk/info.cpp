@@ -1,6 +1,5 @@
 #include "info.hpp"
 #include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_structs.hpp>
 
 VkCommandPoolCreateInfo info::create::command_pool(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags)
 {

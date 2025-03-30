@@ -1,5 +1,5 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 #include "types.hpp"
 #include "vk_mem_alloc.h"
 namespace engine {

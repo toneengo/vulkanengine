@@ -238,8 +238,8 @@ VkPipeline GraphicsPipelineBuilder::build()
         abort();
     }
 
-    QUEUE_OBJ_DESTROY(pipeline);
-    QUEUE_OBJ_DESTROY(layout);
+    QUEUE_DESTROY_OBJ(pipeline);
+    QUEUE_DESTROY_OBJ(layout);
     return pipeline;
 }
 
@@ -287,7 +287,7 @@ VkPipeline ComputePipelineBuilder::build()
 
 	VK_CHECK(vkCreateComputePipelines(engine::ctx.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pipeline));
     
-    QUEUE_OBJ_DESTROY(pipeline);
-    QUEUE_OBJ_DESTROY(layout);
+    QUEUE_DESTROY_OBJ(pipeline);
+    QUEUE_DESTROY_OBJ(layout);
     return pipeline;
 }

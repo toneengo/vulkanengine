@@ -1,8 +1,8 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 #include "vk_mem_alloc.h"
 #include <glm/glm.hpp>
+#include <vector>
 namespace engine
 {
     struct Binding
@@ -10,14 +10,16 @@ namespace engine
         uint32_t binding;
         VkDescriptorType type;
         uint32_t count;
+        VkDescriptorBindingFlags flags = 0;
     };
 
     struct Image {
         VkImage image = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
         VmaAllocation allocation = VK_NULL_HANDLE;
-        VkExtent3D imageExtent;
+        VkExtent3D imageExtent = {};
         VkFormat imageFormat = VK_FORMAT_UNDEFINED;
+        uint32_t index = -1;
     };
 
     struct Buffer {
@@ -54,10 +56,17 @@ namespace engine
         uint32_t startIndex;
         uint32_t count;
     };
-
-    struct MeshAsset {
+    
+    struct Mesh {
         std::vector<GeoSurface> surfaces;
         GPUMeshBuffers meshBuffers;
+        Image diffuse;
+        Image normal;
+        Image specular;
+    };
+
+    struct Model {
+        std::vector<Mesh> meshes;
     };
 
 }

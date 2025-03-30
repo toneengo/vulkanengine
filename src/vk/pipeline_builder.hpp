@@ -1,6 +1,5 @@
 #pragma once
 #include <initializer_list>
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 #include "types.hpp"
 

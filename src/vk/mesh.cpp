@@ -3,12 +3,30 @@
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
+#include <span>
 using namespace engine;
 
+std::unordered_map<std::string, Image> loadedTextures;
 GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
-MeshAsset processMesh(aiMesh *mesh, const aiScene *scene)
+Image load_material_texture(aiMaterial *mat, aiTextureType type, const std::string& directory)
 {
-    MeshAsset newmesh;
+    if (mat->GetTextureCount(type) == 0) return {};
+    assert(mat->GetTextureCount(type) == 1); //only 1 texture per mesh PLZ
+    aiString str;
+    mat->GetTexture(type, 0, &str);
+    std::string stdstr(directory + str.C_Str());
+
+    if (loadedTextures.contains(stdstr))
+        return loadedTextures[stdstr];
+    Image texture = create_texture(stdstr.c_str(), VK_IMAGE_USAGE_SAMPLED_BIT);
+    loadedTextures[stdstr] = texture;
+    printf("Loaded mesh texture %s\n", stdstr.c_str());
+    return texture;
+}
+
+Mesh processMesh(aiMesh *mesh, const aiScene *scene, const std::string& directory)
+{
+    Mesh newmesh;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
@@ -40,6 +58,7 @@ MeshAsset processMesh(aiMesh *mesh, const aiScene *scene)
         }
         vertices.push_back(vertex);
     }
+
     // process indices
     for (uint32_t i = 0; i < mesh->mNumFaces; i++)
     {
@@ -52,45 +71,47 @@ MeshAsset processMesh(aiMesh *mesh, const aiScene *scene)
         for (uint32_t j = 0; j < face.mNumIndices; j++)
             indices.push_back(face.mIndices[j]);
     }
-    newmesh.meshBuffers = upload_mesh(indices, vertices);
-    /*
-    // process material
     if(mesh->mMaterialIndex >= 0)
     {
-        [...]
+        aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+        newmesh.diffuse = load_material_texture(material, aiTextureType_DIFFUSE, directory);
+        newmesh.specular = load_material_texture(material, aiTextureType_SPECULAR, directory);
+        newmesh.normal = load_material_texture(material, aiTextureType_NORMALS, directory);
     }
-    */
+    newmesh.meshBuffers = upload_mesh(indices, vertices);
 
     return newmesh;
 }  
 
-void processNode(aiNode *node, const aiScene *scene, std::unordered_map<std::string, MeshAsset>& meshes)
+void processNode(aiNode *node, const aiScene *scene, Model &model, const std::string& directory)
 {
     // process all the node's meshes (if any)
     for(unsigned int i = 0; i < node->mNumMeshes; i++)
     {
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]]; 
-        meshes[mesh->mName.C_Str()] = processMesh(mesh, scene);
-        printf("Loaded mesh '%s'\n", mesh->mName.C_Str());
+        model.meshes.push_back(processMesh(mesh, scene, directory));
     }
     // then do the same for each of its children
     for(unsigned int i = 0; i < node->mNumChildren; i++)
     {
-        processNode(node->mChildren[i], scene, meshes);
+        processNode(node->mChildren[i], scene, model, directory);
     }
 }
 
-void engine::load_gltf_meshes(const char* filePath, std::unordered_map<std::string, MeshAsset>& meshes)
+Model engine::load_gltf_model(const char* filePath)
 {
     Assimp::Importer import;
-    const aiScene *scene = import.ReadFile(filePath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+    const aiScene *scene = import.ReadFile(filePath, aiProcess_Triangulate | aiProcess_GenNormals);
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) 
     {
         printf("ERROR::ASSIMP:: %s\n", import.GetErrorString());
-        return;
+        abort();
     }
 
-    processNode(scene->mRootNode, scene, meshes);
-
-    return;
+    std::string directory(filePath);
+    directory.erase(directory.begin() + directory.find_last_of('/') + 1, directory.end());
+    Model model;
+    processNode(scene->mRootNode, scene, model, directory);
+    printf("Loaded model %s\n", filePath);
+    return model;
 }

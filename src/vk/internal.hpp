@@ -1,11 +1,10 @@
 //here, the vulkan data (RenderContext), is a singleton object that is accessible via #include "interal.hpp"
 #pragma once
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 #include "vk_mem_alloc.h"
 #include "types.hpp"
 #include "destroy.hpp"
 #include "descriptor.hpp"
-#include <unordered_map>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -62,25 +61,33 @@ namespace engine {
             VkFormat imageFormat;
             VkExtent2D extent;
         };
-
+        
         Framebuffer framebuffer; //main framebuffer
         Swapchain swapchain;
         engine::DestroyQueue destroyQueue;
     } ctx;
+
+    inline VkDescriptorSetLayout samplerDescriptorSetLayout;
+    inline VkDescriptorSet samplerDescriptorSet;
+    inline VkSampler linearSampler;
+    inline VkSampler nearestSampler;
 
     inline FrameContext& get_frame() {
         return ctx.frames[ctx.frameIdx % FRAME_OVERLAP];
     }
     inline DestroyQueue destroyQueue;
 #ifdef DBG
-#define QUEUE_OBJ_DESTROY(x) do {\
+#define QUEUE_DESTROY_OBJ(x) do {\
         engine::Object o(x);\
         o.lineNumber = __LINE__;\
         o.fileName = __FILE__;\
         engine::destroyQueue.push(o);\
     } while(0)
 #else
-#define QUEUE_OBJ_DESTROY(x) destroyQueue.push(x);
+#define QUEUE_DESTROY_OBJ(x) destroyQueue.push(x);
 #endif
 
+    constexpr int STORAGE_COUNT = 65536;
+    constexpr int SAMPLER_COUNT = 65536;
+    constexpr int IMAGE_COUNT = 65536;
 }

@@ -1,8 +1,8 @@
 #version 460
 #extension GL_EXT_buffer_reference : require
 
-layout (location = 0) out vec3 outColor;
-layout (location = 1) out vec2 outUV;
+layout (location = 0) out vec2 uv;
+layout (location = 1) out int diffuse;
 
 layout(set = 0, binding = 0) uniform CameraData{   
 	mat4 view;
@@ -25,6 +25,9 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer{
 //push constants block
 layout( push_constant ) uniform constants
 {	
+    int diffuse;
+    int normal;
+    int specular;
 	mat4 render_matrix;
 	VertexBuffer vertexBuffer;
 } PushConstants;
@@ -36,7 +39,7 @@ void main()
 
 	//output data
 	gl_Position = camera.proj * camera.view * vec4(v.position, 1.0f);
-	outColor = v.color.xyz;
-	outUV.x = v.uv_x;
-	outUV.y = v.uv_y;
+    diffuse = PushConstants.diffuse;
+	uv.x = v.uv_x;
+	uv.y = v.uv_y;
 }

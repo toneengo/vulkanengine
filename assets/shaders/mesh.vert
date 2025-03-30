@@ -5,6 +5,8 @@
 
 #include "input_structures.glsl"
 
+layout (binding = 1) uniform sampler2D Sampler2D[];
+
 layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec3 outColor;
 layout (location = 2) out vec2 outUV;
