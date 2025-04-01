@@ -14,10 +14,9 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
         "cacheVariables": {
-            "CMAKE_CXX_FLAGS": "/utf-8",
             "CMAKE_C_COMPILER": "cl.exe",
             "CMAKE_CXX_COMPILER": "cl.exe",
-            "CMAKE_TOOLCHAIN_FILE": "C:\\Users\\tongny\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+            "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}\\scripts\\buildsystems\\vcpkg.cmake"
         },
       "architecture": {
         "value": "x64",
