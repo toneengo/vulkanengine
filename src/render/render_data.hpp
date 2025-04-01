@@ -56,7 +56,9 @@ inline Model guitar;
 //some settings
 inline bool FPS_UNLIMITED = false;
 inline int FPS_LIMIT = 240;
-inline std::chrono::nanoseconds nsDelta(0);
+inline int TICK_LIMIT = 240;
+inline std::chrono::nanoseconds delta(0);
+
+inline std::chrono::nanoseconds tick(0);
 
 }
-#define NS_PER_SEC 1000000000

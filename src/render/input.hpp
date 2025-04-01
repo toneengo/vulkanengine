@@ -16,14 +16,14 @@ enum ButtonState {
 namespace spock {
     inline struct InputData {
         int keyStates[GLFW_KEY_LAST + 1];
-        int mouseButtonStates[GLFW_MOUSE_BUTTON_LAST + 1];
+        int mouseStates[GLFW_MOUSE_BUTTON_LAST + 1];
         int mods;
         float lastX;
         float lastY;
-        glm::vec2 mouseRelativeMotion;
+        glm::dvec2 mouseRelativeMotion;
         bool firstMouse = false;
         InputData() { memset(keyStates, KEY_Off, sizeof(int)*(GLFW_KEY_LAST+1));
-                      memset(mouseButtonStates, KEY_Off, sizeof(int)*(GLFW_MOUSE_BUTTON_LAST+1)); }
+                      memset(mouseStates, KEY_Off, sizeof(int)*(GLFW_MOUSE_BUTTON_LAST+1)); }
     } input;
     void init_input_callbacks();
     //needs to be run before GlfwPollEvents

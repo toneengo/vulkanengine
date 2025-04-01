@@ -28,8 +28,8 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (prevCallbackMousebutton) prevCallbackMousebutton(window, button, action, mods);
     input.mods = mods;
-    if (action == GLFW_RELEASE) input.mouseButtonStates[button] = KEY_Off;
-    else if (input.mouseButtonStates[button] == KEY_Off) input.mouseButtonStates[button] = KEY_Press;
+    if (action == GLFW_RELEASE) input.mouseStates[button] = KEY_Off;
+    else if (input.mouseStates[button] == KEY_Off) input.mouseStates[button] = KEY_Press;
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -57,7 +57,7 @@ void spock::update_input()
 
     for (int i = 0; i < GLFW_MOUSE_BUTTON_LAST + 1; i++)
     {
-        if (input.mouseButtonStates[i] == KEY_Press) input.mouseButtonStates[i] = KEY_Held;
-        if (input.mouseButtonStates[i] == KEY_Release) input.mouseButtonStates[i] = KEY_Off;
+        if (input.mouseStates[i] == KEY_Press) input.mouseStates[i] = KEY_Held;
+        if (input.mouseStates[i] == KEY_Release) input.mouseStates[i] = KEY_Off;
     }
 }

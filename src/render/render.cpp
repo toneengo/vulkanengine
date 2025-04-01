@@ -23,25 +23,26 @@
 
 using namespace spock;
 struct {
-    float yaw = 90.f;
-    float pitch = 0.f;
-    float roll = 0.f;
-    float sensitivity = 0.5f;
-    float speed = 0.1f;
+    double yaw = 90.f;
+    double pitch = 0.f;
+    double roll = 0.f;
+    double sensitivity = 0.1f;
+    double speed = 0.05f;
 
-    glm::vec3 pos = {0, 0, -5};
-    glm::vec3 front = {0, 0, 1};
-    glm::vec3 up = {0, 1, 0};
-    glm::vec3 right = {1, 0, 0};
+    glm::dvec3 pos = {0, 0, -5};
+    glm::dvec3 front = {0, 0, 1};
+    glm::dvec3 up = {0, 1, 0};
+    glm::dvec3 right = {1, 0, 0};
 
     void update()
     {
+        double msPassed = double(delta.count()) / double(NS_PER_MS);
         right = glm::normalize(glm::cross({0, 1, 0}, front));
         up = glm::cross(front, right);
-        if (input.mouseButtonStates[GLFW_MOUSE_BUTTON_2] == KEY_Held)
+        if (input.mouseStates[GLFW_MOUSE_BUTTON_2] == KEY_Held)
         {
             yaw += input.mouseRelativeMotion.x * sensitivity;
-            pitch += input.mouseRelativeMotion.y *  sensitivity;
+            pitch += input.mouseRelativeMotion.y * sensitivity;
         }
 
         if(pitch > 89.0f)
@@ -55,12 +56,12 @@ struct {
         direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
         front = glm::normalize(direction);
 
-        if (input.keyStates[GLFW_KEY_W] & KEY_PressORHeld) pos += speed * front;
-        if (input.keyStates[GLFW_KEY_A] & KEY_PressORHeld) pos += speed * right;
-        if (input.keyStates[GLFW_KEY_S] & KEY_PressORHeld) pos -= speed * front;
-        if (input.keyStates[GLFW_KEY_D] & KEY_PressORHeld) pos -= speed * right;
-        if (input.keyStates[GLFW_KEY_SPACE] & KEY_PressORHeld) pos += speed * glm::vec3{0,1,0};
-        if (input.keyStates[GLFW_KEY_LEFT_CONTROL] & KEY_PressORHeld) pos -= speed * glm::vec3{0,1,0};
+        if (input.keyStates[GLFW_KEY_W] & KEY_PressORHeld) pos += speed * front * msPassed;
+        if (input.keyStates[GLFW_KEY_A] & KEY_PressORHeld) pos += speed * right * msPassed;
+        if (input.keyStates[GLFW_KEY_S] & KEY_PressORHeld) pos -= speed * front * msPassed;
+        if (input.keyStates[GLFW_KEY_D] & KEY_PressORHeld) pos -= speed * right * msPassed;
+        if (input.keyStates[GLFW_KEY_SPACE] & KEY_PressORHeld) pos += speed * glm::dvec3{0,1,0} * msPassed;
+        if (input.keyStates[GLFW_KEY_LEFT_CONTROL] & KEY_PressORHeld) pos -= speed * glm::dvec3{0,1,0} * msPassed;
     }
 
     glm::mat4 view_matrix()
@@ -275,39 +276,28 @@ static void render() {
 void spock::run() {
     using namespace std::chrono_literals;
     namespace stc = std::chrono;
-    stc::nanoseconds accumulator(0);
-    stc::nanoseconds timeElapsed(0);
 
     uint32_t fps = 0;
-    uint32_t fpsCounter = 0;
-    auto currentTime = stc::steady_clock::now();
+    uint32_t frameCounter = 0;
+    stc::nanoseconds second(0);
+    auto lastFrame = stc::steady_clock::now();
 
     while (!glfwWindowShouldClose(ctx.window)) {
-        auto startTime = stc::steady_clock::now();
-        nsDelta = startTime - currentTime;
+        //#TODO: tick != fps
+        tick = stc::nanoseconds(NS_PER_SEC / FPS_LIMIT);
+        auto now = stc::steady_clock::now();
+        if (now - lastFrame < tick && !FPS_UNLIMITED)
+            continue;
 
-        if (timeElapsed.count() >= NS_PER_SEC)
+        delta = now - lastFrame;
+        second += delta;
+        if (second >= stc::nanoseconds(NS_PER_SEC))
         {
-            timeElapsed -= stc::nanoseconds(NS_PER_SEC);
-            fps = fpsCounter;
-            fpsCounter = 0;
+            fps = frameCounter;
+            frameCounter = 0;
+            second -= stc::nanoseconds(NS_PER_SEC);
         }
-
-        timeElapsed += nsDelta;
-
-        if (!FPS_UNLIMITED)
-        {
-            accumulator += nsDelta;
-            stc::nanoseconds tickTime(NS_PER_SEC / FPS_LIMIT);
-
-            if (accumulator < tickTime) 
-                continue;
-
-            accumulator -= tickTime;
-        }
-        
-        currentTime = startTime;
-        fpsCounter++;
+        lastFrame = now;
 
         update_input();
         glfwPollEvents();
@@ -316,12 +306,12 @@ void spock::run() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         if (ImGui::Begin("background")) {
-            ImGui::SliderFloat("camera sensitivity", &camera.sensitivity, 0, 1.0);
-            ImGui::SliderFloat("camera speed per ms", &camera.speed, 0, 1.0);
-            ImGui::SliderInt("max fps", &FPS_LIMIT, 30, 240);
+            ImGui::SliderDouble("camera sensitivity", &camera.sensitivity, 0, 1.0);
+            ImGui::SliderDouble("camera speed per ms", &camera.speed, 0, 0.1);
+            ImGui::SliderInt("max fps", &FPS_LIMIT, 15, 240);
             ImGui::Checkbox("unlimited fps", &FPS_UNLIMITED);
             ImGui::Text("FPS: %d", fps);
-            ImGui::Text("%d ms since last frame", int(nsDelta.count() / NS_PER_SEC));
+            ImGui::Text("%d ms since last frame", int(delta.count() / NS_PER_MS));
         }
         ImGui::End();
 
@@ -330,7 +320,10 @@ void spock::run() {
         new_frame();
         render();
         end_frame();
+
         glfwMakeContextCurrent(ctx.window);
         glfwSwapBuffers(ctx.window);
+
+        frameCounter++;
     }
 }

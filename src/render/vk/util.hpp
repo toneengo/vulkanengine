@@ -1,5 +1,14 @@
 #pragma once
 #include <vulkan/vulkan_core.h>
+#include "imgui.h"
+
+// extending imgui with some helper functions
+namespace ImGui {
+    inline bool SliderDouble(const char* label, double* v, double v_min, double v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+    {
+        return SliderScalar(label, ImGuiDataType_Double, v, &v_min, &v_max, format, flags);
+    }
+}
 
 namespace spock {
     inline VkImageSubresourceRange image_subresource_range(VkImageAspectFlags aspectMask) {
@@ -103,12 +112,3 @@ namespace spock {
     }
 
 }
-
-#define write_uniform_buffer_descriptor(ds, src, size,dq) do {\
-    Buffer buf = create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);\
-    dq.push(buf);\
-    void* dst = get_mapped_data(buf.allocation);\
-    memcpy(dst, src, size);\
-    update_descriptor_sets({}, {{ds, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, buf.buffer, 0, size}});\
-} while(0)
-

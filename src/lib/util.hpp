@@ -32,3 +32,16 @@ inline void log_line(const char* source)
         buf[bufpos++] = *c;
     }
 }
+
+#define NS_PER_SEC 1000000000
+#define MS_PER_SEC 1000
+#define NS_PER_MS  1000000
+
+#define write_uniform_buffer_descriptor(ds, src, size,dq) do {\
+    Buffer buf = create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);\
+    dq.push(buf);\
+    void* dst = get_mapped_data(buf.allocation);\
+    memcpy(dst, src, size);\
+    update_descriptor_sets({}, {{ds, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, buf.buffer, 0, size}});\
+} while(0)
+
