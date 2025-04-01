@@ -9,6 +9,7 @@ Current features:
 - Bindless descriptors
 - Camera movement (WASD, right click to look around)
 - Vulkan API abstractions
+- Cross platform
 
 To-do:
 - Game engine
