@@ -9,6 +9,7 @@ out/**
 vcpkg_installed/**
 
 # Local-only files
+.DS_Store
 CMakeFiles/**
 CMakeUserPresets.json
 CMakeSettings.json
