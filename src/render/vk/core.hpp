@@ -42,7 +42,6 @@ namespace spock {
     Image                 create_texture(const char* fileName, VkDescriptorSet descriptorSet, uint32_t binding, VkSampler sampler, VkImageUsageFlags usage, bool mipmapped = false);
     Buffer                create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void                  create_swapchain(uint32_t width, uint32_t height);
-
     
     void                  set_scissor(); 
 

@@ -4,16 +4,16 @@
 #include <string.h>
 #include <glm/vec2.hpp>
 
-enum ButtonState {
-    KEY_Off = 0,
-    KEY_Press = 0b0001,
-    KEY_Held = 0b0010,
-    KEY_Release = 0b0100,
-
-    KEY_PressORHeld = 0b0011
-};
-
 namespace spock {
+    enum ButtonState {
+        KEY_Off = 0,
+        KEY_Press = 0b0001,
+        KEY_Held = 0b0010,
+        KEY_Release = 0b0100,
+
+        KEY_PressORHeld = 0b0011
+    };
+
     inline struct InputData {
         int keyStates[GLFW_KEY_LAST + 1];
         int mouseStates[GLFW_MOUSE_BUTTON_LAST + 1];

@@ -5,15 +5,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS OFF)
 
+option(SPOCK_BUILD_LIBRARY "just build the abstractions as a library" OFF)
+
 project("vulkanengine")
 
-add_executable(vulkanengine)
+if(SPOCK_BUILD_LIBARY)
+    add_library(vulkanengine)
+else()
+    add_executable(vulkanengine)
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "vulkanengine")
 
-find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(vulkanengine PRIVATE glfw)
-find_package(Vulkan REQUIRED)
-target_link_libraries(vulkanengine PRIVATE Vulkan::Vulkan)
+
+if(NOT SPOCK_BUILD_LIBRARY)
+    find_package(glfw3 CONFIG REQUIRED)
+    target_link_libraries(vulkanengine PRIVATE glfw)
+endif()
+
+if(NOT SPOCK_BUILD_LIBRARY)
+    find_package(Vulkan REQUIRED)
+    target_link_libraries(vulkanengine PRIVATE Vulkan::Vulkan)
+endif()
+
 find_package(glslang REQUIRED)
 target_link_libraries(vulkanengine PRIVATE glslang::glslang)
 target_link_libraries(vulkanengine PRIVATE glslang::glslang-default-resource-limits)
@@ -32,10 +46,12 @@ target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(env{CMAKE_BUILD_PARALLEL_LEVEL} "16")
 
-add_custom_target(assets 
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
+if(NOT SPOCK_BUILD_LIBRARY)
+    add_custom_target(assets 
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
-add_dependencies(vulkanengine assets)
+    add_dependencies(vulkanengine assets)
+endif
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
     message(STATUS "Configuring Sector33 in Debug with CMake")
