@@ -51,7 +51,7 @@ if(NOT SPOCK_BUILD_LIBRARY)
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
     add_dependencies(vulkanengine assets)
-endif
+endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
     message(STATUS "Configuring Sector33 in Debug with CMake")
