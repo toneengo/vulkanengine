@@ -17,16 +17,11 @@ endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "vulkanengine")
 
+find_package(glfw3 CONFIG REQUIRED)
+target_link_libraries(vulkanengine PRIVATE glfw)
 
-if(NOT SPOCK_BUILD_LIBRARY)
-    find_package(glfw3 CONFIG REQUIRED)
-    target_link_libraries(vulkanengine PRIVATE glfw)
-endif()
-
-if(NOT SPOCK_BUILD_LIBRARY)
-    find_package(Vulkan REQUIRED)
-    target_link_libraries(vulkanengine PRIVATE Vulkan::Vulkan)
-endif()
+find_package(Vulkan REQUIRED)
+target_link_libraries(vulkanengine PRIVATE Vulkan::Vulkan)
 
 find_package(glslang REQUIRED)
 target_link_libraries(vulkanengine PRIVATE glslang::glslang)
@@ -44,13 +39,12 @@ target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src
 target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
-set(env{CMAKE_BUILD_PARALLEL_LEVEL} "16")
 
 if(NOT SPOCK_BUILD_LIBRARY)
-    add_custom_target(assets 
+    add_custom_target(SPOCK_assets 
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
-    add_dependencies(vulkanengine assets)
+    add_dependencies(vulkanengine SPOCK_assets)
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
