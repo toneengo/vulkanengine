@@ -21,7 +21,7 @@ find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(spock PRIVATE glfw)
 
 find_package(Vulkan REQUIRED)
-target_link_libraries(spock PRIVATE Vulkan::Vulkan)
+target_link_libraries(spock PUBLIC Vulkan::Vulkan)
 
 find_package(glslang REQUIRED)
 target_link_libraries(spock PRIVATE glslang::glslang)
@@ -31,6 +31,8 @@ target_link_libraries(spock PRIVATE glslang::glslang-default-resource-limits)
 
 find_package(assimp REQUIRED)
 target_link_libraries(spock PRIVATE assimp::assimp)
+
+find_package(assimp REQUIRED)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
 target_link_libraries(spock PRIVATE vk-bootstrap::vk-bootstrap)
@@ -73,4 +75,6 @@ if(SPOCK_BUILD_ENGINE)
 
     add_dependencies(spockengine SPOCK_assets spock)
     target_link_libraries(spockengine PRIVATE spock)
+    find_package(glm REQUIRED)
+    target_link_libraries(spockengine PRIVATE glm::glm)
 endif()

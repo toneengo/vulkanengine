@@ -425,6 +425,12 @@ Image spock::create_texture(const char* fileName, uint32_t index, VkDescriptorSe
     destroyQueue.push(image.imageView);
     return image;
 }
+void spock::create_texture(Image& image, uint32_t index, VkDescriptorSet descriptorSet, uint32_t binding, VkSampler sampler)
+{
+    image.index = index;
+    update_descriptor_sets(
+        {{descriptorSet, binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sampler, image.imageView, VK_IMAGE_LAYOUT_GENERAL, index}}, {});
+}
 
 Image spock::create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
     Image newImage;

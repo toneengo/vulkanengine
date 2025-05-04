@@ -10,3 +10,6 @@
 [submodule "vk-bootstrap"]
 	path = vk-bootstrap
 	url = https://github.com/charles-lunarg/vk-bootstrap.git
+[submodule "texgui"]
+	path = texgui
+	url = https://github.com/toneengo/texgui

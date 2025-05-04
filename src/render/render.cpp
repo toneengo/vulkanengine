@@ -22,6 +22,7 @@
 #include "render_data.hpp"
 
 using namespace spock;
+uint32_t currentTextureIndex = 0;
 struct {
     double yaw = 90.f;
     double pitch = 0.f;
@@ -144,6 +145,9 @@ void spock::init_engine() {
     guitar = load_gltf_model("assets/meshes/guitar/backpack.obj");
     for (auto& mesh: guitar.meshes)
     {
+        create_texture(mesh.diffuse, currentTextureIndex++, samplerDescriptorSet, SAMPLER_BINDING, linearSampler);
+        create_texture(mesh.normal, currentTextureIndex++, samplerDescriptorSet, SAMPLER_BINDING, linearSampler);
+        create_texture(mesh.specular, currentTextureIndex++, samplerDescriptorSet, SAMPLER_BINDING, linearSampler);
     }
 
     clean_init();
