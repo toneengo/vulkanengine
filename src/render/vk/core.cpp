@@ -10,7 +10,6 @@
 #include "vk_mem_alloc.h"
 #include "VkBootstrap.h"
 
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #include "imgui.h"
@@ -385,20 +384,41 @@ Image spock::create_image(void* data, VkExtent3D size, VkFormat format, VkImageU
     return new_image;
 }
 
-Image spock::create_texture(const char* fileName, VkDescriptorSet descriptorSet, uint32_t binding, VkSampler sampler, VkImageUsageFlags usage, bool mipmapped) {
+Image spock::create_image(const char* fileName, VkImageUsageFlags usage, bool mipmapped)
+{
     VkExtent3D     extent{};
-    int            width, height;
-    unsigned char* pixels = stbi_load(fileName, &width, &height, nullptr, 4);
-    extent.width          = width;
-    extent.height         = height;
-    extent.depth          = 1;
+    int            width = 0, height = 0;
+    unsigned char* pixels = nullptr;
+    bool empty = false;
+    pixels = stbi_load(fileName, &width, &height, nullptr, 4);
+
+    //create empty pixel image if couldn't load
+    if (width == 0 || height == 0)
+    {
+        extent.width          = 1;
+        extent.height         = 1;
+        extent.depth          = 1;
+        pixels = new unsigned char[4];
+        memset(pixels, 0, sizeof(unsigned char)*4);
+        empty = true;
+    }
+    else
+    {
+        extent.width          = width;
+        extent.height         = height;
+        extent.depth          = 1;
+    }
 
     auto image = create_image(pixels, extent, VK_FORMAT_R8G8B8A8_UNORM, usage, mipmapped);
-    stbi_image_free(pixels);
+    if (empty) free(pixels);
+    else stbi_image_free(pixels);
+    return image;
+}
 
-    image.index = ctx.textureCount++;
+Image spock::create_texture(const char* fileName, uint32_t index, VkDescriptorSet descriptorSet, uint32_t binding, VkSampler sampler, VkImageUsageFlags usage, bool mipmapped) {
+    auto image = create_image(fileName, usage, mipmapped);
     update_descriptor_sets(
-        {{descriptorSet, binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sampler, image.imageView, VK_IMAGE_LAYOUT_GENERAL, image.index}}, {});
+        {{descriptorSet, binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sampler, image.imageView, VK_IMAGE_LAYOUT_GENERAL, index}}, {});
 
     destroyQueue.push(image);
     destroyQueue.push(image.imageView);

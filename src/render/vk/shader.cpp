@@ -103,6 +103,7 @@ class DirStackFileIncluder : public glslang::TShader::Includer {
 static std::vector<uint32_t> compileShaderToSPIRV_Vulkan(const char* const* shaderSource, EShLanguage stage) {
     glslang::InitializeProcess();
     DirStackFileIncluder includer;
+//#TODO: PLZ DONT HARDCODE  assets/shaders 
     includer.pushExternalLocalDirectory("assets/shaders");
 
     glslang::TShader shader(stage);

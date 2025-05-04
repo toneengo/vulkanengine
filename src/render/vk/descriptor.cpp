@@ -63,7 +63,7 @@ VkDescriptorSet DescriptorAllocator::allocate(VkDescriptorSetLayout layout) {
         currentPool++;
         if (currentPool == pools.size()) {
             pools.push_back(create_pool());
-            setsPerPool *= 1.5;
+            setsPerPool *= 2;
         }
         allocInfo.descriptorPool = pools[currentPool];
         VK_CHECK(vkAllocateDescriptorSets(ctx.device, &allocInfo, &ds));

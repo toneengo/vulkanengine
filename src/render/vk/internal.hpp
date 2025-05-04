@@ -60,10 +60,12 @@ namespace spock {
         };
 
         //settable by the "user"
+        /*
         VkDescriptorSet textureDescriptorSet = VK_NULL_HANDLE;
-        uint32_t textureDescriptorSetBinding = 0;
         VkSampler currentSampler = VK_NULL_HANDLE;
+        uint32_t textureDescriptorSetBinding = 0;
         uint32_t textureCount = 0;
+        */
 
         Framebuffer          framebuffer; //main framebuffer
         Swapchain            swapchain;
@@ -74,8 +76,10 @@ namespace spock {
     inline FrameContext&         get_frame() {
         return ctx.frames[ctx.frameIdx % FRAME_OVERLAP];
     }
+    inline void         finish_frame() {
+        ctx.frameIdx++;
+    }
     inline DestroyQueue destroyQueue;
-}
 
 #ifdef DBG
 #define QUEUE_DESTROY_OBJ(x)                                                                                                                                                       \
@@ -89,3 +93,4 @@ namespace spock {
 #define QUEUE_DESTROY_OBJ(x) destroyQueue.push(x);
 #endif
 
+}

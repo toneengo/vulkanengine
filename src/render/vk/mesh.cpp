@@ -77,7 +77,7 @@ Image load_material_texture(aiMaterial* mat, aiTextureType type, const std::stri
 
     if (loadedTextures.contains(stdstr))
         return loadedTextures[stdstr];
-    Image texture          = create_texture(stdstr.c_str(), ctx.textureDescriptorSet, ctx.textureDescriptorSetBinding, ctx.currentSampler, VK_IMAGE_USAGE_SAMPLED_BIT);
+    Image texture          = create_image(stdstr.c_str(), VK_IMAGE_USAGE_SAMPLED_BIT);
     loadedTextures[stdstr] = texture;
     printf("Loaded mesh texture %s\n", stdstr.c_str());
     return texture;

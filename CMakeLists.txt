@@ -5,47 +5,43 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS OFF)
 
-option(SPOCK_BUILD_LIBRARY "just build the abstractions as a library" OFF)
+option(SPOCK_BUILD_LIBRARY "just build the abstractions as a library" ON)
+option(SPOCK_BUILD_ENGINE "just build the abstractions as a library" OFF)
 
-project("vulkanengine")
+project("spock")
 
-if(SPOCK_BUILD_LIBARY)
-    add_library(vulkanengine)
-else()
-    add_executable(vulkanengine)
+if(SPOCK_BUILD_LIBRARY)
+    add_library(spock)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "vulkanengine")
+if(SPOCK_BUILD_ENGINE)
+    add_executable(spockengine)
+endif()
+
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "spock")
 
 find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(vulkanengine PRIVATE glfw)
+target_link_libraries(spock PRIVATE glfw)
 
 find_package(Vulkan REQUIRED)
-target_link_libraries(vulkanengine PRIVATE Vulkan::Vulkan)
+target_link_libraries(spock PRIVATE Vulkan::Vulkan)
 
 find_package(glslang REQUIRED)
-target_link_libraries(vulkanengine PRIVATE glslang::glslang)
-target_link_libraries(vulkanengine PRIVATE glslang::glslang-default-resource-limits)
-target_link_libraries(vulkanengine PRIVATE glslang::glslang)
-target_link_libraries(vulkanengine PRIVATE glslang::glslang-default-resource-limits)
+target_link_libraries(spock PRIVATE glslang::glslang)
+target_link_libraries(spock PRIVATE glslang::glslang-default-resource-limits)
+target_link_libraries(spock PRIVATE glslang::glslang)
+target_link_libraries(spock PRIVATE glslang::glslang-default-resource-limits)
 
 find_package(assimp REQUIRED)
-target_link_libraries(vulkanengine PRIVATE assimp::assimp)
+target_link_libraries(spock PRIVATE assimp::assimp)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
-target_link_libraries(vulkanengine PRIVATE vk-bootstrap::vk-bootstrap)
+target_link_libraries(spock PRIVATE vk-bootstrap::vk-bootstrap)
 
-target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
+target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-if(NOT SPOCK_BUILD_LIBRARY)
-    add_custom_target(SPOCK_assets 
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
-
-    add_dependencies(vulkanengine SPOCK_assets)
-endif()
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
     message(STATUS "Configuring Sector33 in Debug with CMake")
@@ -55,13 +51,21 @@ else()
     message(STATUS "Configuring Sector33 in Release with CMake")
 endif()
 
-target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assimp/include")
-target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
-target_include_directories(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
-target_sources(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
+target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assimp/include")
+target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
+target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
+target_sources(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
                                     "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp"
                                     "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_demo.cpp"
                                     "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp"
                                     "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp"
                                     "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp"
                                     "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp")
+
+if(SPOCK_BUILD_ENGINE)
+    add_custom_target(SPOCK_assets 
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
+
+    add_dependencies(spockengine spock)
+    target_link_libraries(spockengine PRIVATE spock)
+endif()

@@ -103,9 +103,6 @@ void spock::init_engine() {
 
     samplerDescriptorSet = ctx.descriptorAllocator.allocate(samplerDescriptorSetLayout);
     //let the global  vulkan context know where the texture descriptor set is
-    ctx.textureDescriptorSet = samplerDescriptorSet;
-    ctx.textureDescriptorSetBinding = SAMPLER_BINDING;
-    ctx.currentSampler = linearSampler;
 
     init_input_callbacks();
     init_imgui();
@@ -186,7 +183,7 @@ void draw_geometry() {
 
     VkDescriptorSet globalDescriptor = frame->descriptorAllocator.allocate(uniformDescLayout);
 
-    write_uniform_buffer_descriptor(globalDescriptor, &sceneData, sizeof(GPUSceneData), frame->destroyQueue);
+    write_uniform_buffer_descriptor(globalDescriptor, &sceneData, sizeof(GPUSceneData));
 
     vkCmdBindDescriptorSets(frame->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vertexPipelineLayout, 0, 1, &globalDescriptor, 0, nullptr);
     vkCmdBindDescriptorSets(frame->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vertexPipelineLayout, SAMPLER_BINDING, 1, &samplerDescriptorSet, 0, nullptr);
