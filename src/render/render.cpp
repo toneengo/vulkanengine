@@ -102,7 +102,6 @@ void spock::init_engine() {
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT);
 
     samplerDescriptorSet = ctx.descriptorAllocator.allocate(samplerDescriptorSetLayout);
-    //let the global  vulkan context know where the texture descriptor set is
 
     init_input_callbacks();
     init_imgui();
@@ -143,6 +142,9 @@ void spock::init_engine() {
     }
 
     guitar = load_gltf_model("assets/meshes/guitar/backpack.obj");
+    for (auto& mesh: guitar.meshes)
+    {
+    }
 
     clean_init();
 }

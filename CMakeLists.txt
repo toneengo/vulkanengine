@@ -5,14 +5,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS OFF)
 
-option(SPOCK_BUILD_LIBRARY "just build the abstractions as a library" ON)
-option(SPOCK_BUILD_ENGINE "just build the abstractions as a library" OFF)
+option(SPOCK_BUILD_ENGINE "build executable" ON)
 
 project("spock")
 
-if(SPOCK_BUILD_LIBRARY)
-    add_library(spock)
-endif()
+add_library(spock)
 
 if(SPOCK_BUILD_ENGINE)
     add_executable(spockengine)
@@ -38,9 +35,6 @@ target_link_libraries(spock PRIVATE assimp::assimp)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
 target_link_libraries(spock PRIVATE vk-bootstrap::vk-bootstrap)
 
-target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
-
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -51,21 +45,32 @@ else()
     message(STATUS "Configuring Sector33 in Release with CMake")
 endif()
 
-target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assimp/include")
-target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
-target_include_directories(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
+list(APPEND Targets spock)
+if (SPOCK_BUILD_ENGINE)
+    list(APPEND Targets spockengine)
+endif()
+
+foreach(TARGET IN LISTS Targets)
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assimp/include")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
+endforeach()
+
 target_sources(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
-                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp"
-                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_demo.cpp"
-                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp"
-                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp"
-                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp"
-                                    "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp")
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp"
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_demo.cpp"
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp"
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp"
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp"
+                                        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp")
+
 
 if(SPOCK_BUILD_ENGINE)
     add_custom_target(SPOCK_assets 
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
-    add_dependencies(spockengine spock)
+    add_dependencies(spockengine SPOCK_assets spock)
     target_link_libraries(spockengine PRIVATE spock)
 endif()
