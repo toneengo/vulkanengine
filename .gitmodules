@@ -13,3 +13,6 @@
 [submodule "texgui"]
 	path = texgui
 	url = https://github.com/toneengo/texgui
+[submodule "VulkanMemoryAllocator"]
+	path = VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

@@ -1,8 +1,10 @@
 #pragma once
 #include <vulkan/vulkan_core.h>
+#undef VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 #include "types.hpp"
 #include "shader.hpp"
+#include "texgui.h"
 
 namespace spock {
     void  clean_init();
@@ -34,6 +36,10 @@ namespace spock {
     void                  init();
     void                  init_imgui();
     void                  draw_imgui(VkImageView imageView);
+
+    void                  init_texgui();
+    void                  draw_texgui(VkImageView imageView, const TexGui::RenderData& rs);
+    
     void                  cleanup();
     VkDescriptorSetLayout create_descriptor_set_layout(std::initializer_list<Binding> _bindings, VkShaderStageFlags shaderStages, VkDescriptorSetLayoutCreateFlags flags = 0);
     Image                 create_image_from_pixels(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
@@ -53,6 +59,4 @@ namespace spock {
     VkCommandBuffer       get_immediate_command_buffer();
     void                  begin_immediate_command();
     void                  end_immediate_command();
-
-    void*                 get_mapped_data(VmaAllocation a);
 }

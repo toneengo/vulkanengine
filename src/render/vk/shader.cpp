@@ -1,5 +1,4 @@
 #include <fstream>
-#include <fstream>
 #include <set>
 #include <algorithm>
 #include <glslang/Public/ShaderLang.h>

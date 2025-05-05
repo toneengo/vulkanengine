@@ -11,6 +11,7 @@
 #include "imgui_impl_vulkan.h"
 
 #include "lib/util.hpp"
+#include "texgui.h"
 #include "vk/core.hpp"
 #include "vk/info.hpp"
 #include "vk/internal.hpp"
@@ -23,6 +24,12 @@
 
 using namespace spock;
 uint32_t currentTextureIndex = 0;
+
+uint32_t selected = 0;
+TexGui::RenderData data; 
+TexGui::RenderData copy; 
+char charbuf[128] = "\0";
+
 struct {
     double yaw = 90.f;
     double pitch = 0.f;
@@ -99,13 +106,14 @@ void spock::init_engine() {
 
     //create descriptor set layouts
     samplerDescriptorSetLayout = create_descriptor_set_layout(
-        {{SAMPLER_BINDING, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SAMPLER_COUNT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT}},
+        {{SAMPLER_BINDING, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SAMPLER_COUNT}},
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT);
 
     samplerDescriptorSet = ctx.descriptorAllocator.allocate(samplerDescriptorSetLayout);
 
     init_input_callbacks();
     init_imgui();
+    init_texgui();
 
     VkShaderModule gradient = create_shader_module("assets/shaders/gradient.comp");
     computeImageDescLayout  = create_descriptor_set_layout({{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}}, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -273,9 +281,51 @@ static void render() {
 
     image_barrier(frame->commandBuffer, ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     draw_imgui(ctx.swapchain.imageViews[swapchainImageIndex]);
+    draw_texgui(ctx.swapchain.imageViews[swapchainImageIndex], copy);
     image_barrier(frame->commandBuffer, ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
 
+static inline void add_texgui_widgets()
+{
+    data.Base.Window("not bob", 400, 500, 200, 200, TexGui::CENTER_X | TexGui::CENTER_Y);
+    auto win = data.Base.Window("bob", 200, 100, 400, 600, TexGui::RESIZABLE);
+
+    auto row = win.Row({200, 0});
+
+    static bool a = false;
+    static bool b = false;
+    static bool c = true;
+
+    static uint32_t selected2 = 0;
+    auto box0 = row[0].Column({24, 24, 24, 24, 24});
+    auto checkBoxCon = box0[0].Row({24, 0});
+    checkBoxCon[0].CheckBox(&a);
+    checkBoxCon[1].Align(TexGui::ALIGN_CENTER_Y).Text("value a");
+
+    checkBoxCon = box0[1].Row({24, 0});
+    checkBoxCon[0].RadioButton(&selected2, 0);
+    checkBoxCon[1].Align(TexGui::ALIGN_CENTER_Y).Text("value b");
+
+    checkBoxCon = box0[2].Row({24, 0});
+    checkBoxCon[0].RadioButton(&selected2, 1);
+    checkBoxCon[1].Align(TexGui::ALIGN_CENTER_Y).Text("value c");
+
+    static std::string input;
+    box0[3].TextInput("std::string input...", input);
+    box0[4].TextInput("char input...", charbuf, 128);
+
+    auto box1 = row[1].ScrollPanel("panel1", TexGui::texByName("box2"));
+    auto grid = box1.Grid();
+
+    for (uint32_t i = 0; i < 10; i++)
+    {
+        grid
+            .ListItem(&selected, i)
+            .Image(TexGui::texByName("lollipop"));
+    }
+
+    copy.copy(data);
+}
 void spock::run() {
     using namespace std::chrono_literals;
     namespace stc = std::chrono;
@@ -319,10 +369,16 @@ void spock::run() {
         ImGui::End();
 
         ImGui::Render();
+        add_texgui_widgets();
+
+        TexGui::newFrame();
 
         new_frame();
         render();
         end_frame();
+
+        data.clear();
+        TexGui::clear();
 
         glfwMakeContextCurrent(ctx.window);
         glfwSwapBuffers(ctx.window);

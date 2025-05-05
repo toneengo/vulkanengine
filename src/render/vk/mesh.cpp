@@ -34,7 +34,7 @@ GPUMeshBuffers                         upload_mesh(std::span<uint32_t> indices, 
     newSurface.indexBuffer = create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
     Buffer staging         = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
-    void*  data = get_mapped_data(staging.allocation);
+    void*  data = staging.info.pMappedData;
 
     // copy vertex buffer
     memcpy(data, vertices.data(), vertexBufferSize);

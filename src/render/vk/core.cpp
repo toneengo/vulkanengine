@@ -6,8 +6,8 @@
 
 #include "info.hpp"
 
-#define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
+
 #include "VkBootstrap.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -16,6 +16,8 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+
+#include "texgui.h"
 
 #include "lib/util.hpp"
 #include "core.hpp"
@@ -97,6 +99,58 @@ void spock::init_imgui() {
     QUEUE_DESTROY_OBJ(imguiPool);
 }
 
+void spock::init_texgui() {
+    // this initializes the core structures of imgui
+
+    TexGui::Defaults::PixelSize = 2;
+    TexGui::Defaults::Font::Size = 20;
+    TexGui::Defaults::Font::MsdfPxRange = 2;
+
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+    pool_info.maxSets                    = 0;
+
+    for (VkDescriptorPoolSize& pool_size : pool_sizes)
+        pool_info.maxSets += pool_size.descriptorCount;
+
+    pool_info.poolSizeCount = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
+    pool_info.pPoolSizes    = pool_sizes;
+
+    VkDescriptorPool texguiPool;
+    VK_CHECK(vkCreateDescriptorPool(ctx.device, &pool_info, nullptr, &texguiPool));
+
+    TexGui::VulkanInitInfo init_info = {};
+    init_info.ApiVersion                = VK_API_VERSION_1_3; // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
+    init_info.Instance                  = ctx.instance;
+    init_info.PhysicalDevice            = ctx.physicalDevice;
+    init_info.Device                    = ctx.device;
+    init_info.QueueFamily               = ctx.graphicsQueueFamily;
+    init_info.Queue                     = ctx.graphicsQueue;
+    init_info.PipelineCache             = VK_NULL_HANDLE;
+    init_info.DescriptorPool            = texguiPool;
+    init_info.UseDynamicRendering       = true;
+    init_info.MinImageCount             = 3;
+    init_info.ImageCount                = 3;
+    init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+    //dynamic rendering parameters for imgui to use
+    init_info.PipelineRenderingCreateInfo                         = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    init_info.PipelineRenderingCreateInfo.colorAttachmentCount    = 1;
+    init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &ctx.swapchain.imageFormat;
+    init_info.Allocator = ctx.allocator;
+
+    TexGui::initGlfwVulkan(ctx.window, init_info);
+    TexGui::loadFont("assets/fonts/Jersey10-Regular.ttf");
+    TexGui::loadTextures("assets/sprites");
+
+    QUEUE_DESTROY_OBJ(texguiPool);
+
+}
 void spock::draw_imgui(VkImageView imageView) {
     const auto&               frame           = get_frame();
     const VkCommandBuffer     cmd             = frame.commandBuffer;
@@ -107,14 +161,26 @@ void spock::draw_imgui(VkImageView imageView) {
     vkCmdEndRendering(cmd);
 }
 
+void spock::draw_texgui(VkImageView imageView, const TexGui::RenderData& rs) {
+    const auto&               frame           = get_frame();
+    const VkCommandBuffer     cmd             = frame.commandBuffer;
+    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo           renderInfo      = info::rendering(ctx.swapchain.extent, &colorAttachment, nullptr);
+    vkCmdBeginRendering(cmd, &renderInfo);
+    TexGui::render_Vulkan(rs, cmd);
+    vkCmdEndRendering(cmd);
+}
+
+
 static void init_glfw_window() {
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    ctx.window              = glfwCreateWindow(800, 600, "vulkan engine", nullptr, nullptr);
-    ctx.windowExtent.width  = 800;
-    ctx.windowExtent.height = 600;
+    ctx.window              = glfwCreateWindow(1920, 1080, "vulkan engine", nullptr, nullptr);
+    ctx.windowExtent.width  = 1920;
+    ctx.windowExtent.height = 1080;
     ctx.monitor             = glfwGetPrimaryMonitor();
     auto mode               = glfwGetVideoMode(ctx.monitor);
     ctx.screenExtent.width  = mode->width;
@@ -427,6 +493,9 @@ Image spock::create_texture(const char* fileName, uint32_t index, VkDescriptorSe
 }
 void spock::create_texture(Image& image, uint32_t index, VkDescriptorSet descriptorSet, uint32_t binding, VkSampler sampler)
 {
+    if (image.image == VK_NULL_HANDLE || image.imageView == VK_NULL_HANDLE) {
+        return;
+    };
     image.index = index;
     update_descriptor_sets(
         {{descriptorSet, binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sampler, image.imageView, VK_IMAGE_LAYOUT_GENERAL, index}}, {});
@@ -520,8 +589,4 @@ void spock::cleanup() {
 
 void spock::destroy_buffer(Buffer buffer) {
     vmaDestroyBuffer(ctx.allocator, buffer.buffer, buffer.allocation);
-}
-
-void* spock::get_mapped_data(VmaAllocation a) {
-    return a->GetMappedData();
 }

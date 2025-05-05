@@ -26,8 +26,6 @@ target_link_libraries(spock PUBLIC Vulkan::Vulkan)
 find_package(glslang REQUIRED)
 target_link_libraries(spock PRIVATE glslang::glslang)
 target_link_libraries(spock PRIVATE glslang::glslang-default-resource-limits)
-target_link_libraries(spock PRIVATE glslang::glslang)
-target_link_libraries(spock PRIVATE glslang::glslang-default-resource-limits)
 
 find_package(assimp REQUIRED)
 target_link_libraries(spock PRIVATE assimp::assimp)
@@ -38,6 +36,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
 target_link_libraries(spock PRIVATE vk-bootstrap::vk-bootstrap)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/texgui)
+target_link_libraries(spock PRIVATE texgui)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
     message(STATUS "Configuring Sector33 in Debug with CMake")
@@ -58,6 +59,9 @@ foreach(TARGET IN LISTS Targets)
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/assimp/include")
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/texgui/include")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/VulkanMemoryAllocator/include")
 endforeach()
 
 target_sources(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
