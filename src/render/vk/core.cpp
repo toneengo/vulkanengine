@@ -145,8 +145,10 @@ void spock::init_texgui() {
     init_info.Allocator = ctx.allocator;
 
     TexGui::initGlfwVulkan(ctx.window, init_info);
+    /*
     TexGui::loadFont("assets/fonts/Jersey10-Regular.ttf");
     TexGui::loadTextures("assets/sprites");
+    */
 
     QUEUE_DESTROY_OBJ(texguiPool);
 

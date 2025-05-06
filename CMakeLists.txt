@@ -38,7 +38,7 @@ target_link_libraries(spock PRIVATE vk-bootstrap::vk-bootstrap)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/texgui)
-target_link_libraries(spock PRIVATE texgui)
+target_link_libraries(spock PUBLIC texgui)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
     message(STATUS "Configuring Sector33 in Debug with CMake")

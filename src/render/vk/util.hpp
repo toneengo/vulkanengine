@@ -1,6 +1,7 @@
 #pragma once
 #include <vulkan/vulkan_core.h>
 #include "imgui.h"
+#include <glm/glm.hpp>
 
 // extending imgui with some helper functions
 namespace ImGui {
@@ -57,6 +58,16 @@ namespace spock {
         vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
+    inline void clear_image(VkCommandBuffer cmd, VkImage image, VkImageLayout layout, VkClearColorValue color) {
+        VkImageSubresourceRange subImage{};
+        subImage.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        subImage.baseMipLevel   = 0;
+        subImage.levelCount     = VK_REMAINING_MIP_LEVELS;
+        subImage.baseArrayLayer = 0;
+        subImage.layerCount     = VK_REMAINING_ARRAY_LAYERS;
+
+        vkCmdClearColorImage(cmd, image, layout, &color, 1, &subImage);
+    }
     inline void blit(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent2D srcSize, VkExtent2D dstSize) {
         VkImageBlit2 blitRegion{.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
 
