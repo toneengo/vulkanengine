@@ -1,10 +1,11 @@
 #pragma once
 //Contains the internal "user" data for render.cpp.
-//user is in quotes cuz i am the user and the actual user is just using the executable.
 #include <vulkan/vulkan_core.h>
 #include <glm/glm.hpp>
 #include "spock/types.hpp"
 #include <chrono>
+#include "texgui.h"
+#include "mesh.hpp"
 namespace vkengine {
 
 inline VkDescriptorSetLayout computeImageDescLayout;
@@ -60,5 +61,16 @@ inline int TICK_LIMIT = 240;
 inline std::chrono::nanoseconds delta(0);
 
 inline std::chrono::nanoseconds tick(0);
+
+inline uint32_t currentTextureIndex = 0;
+
+inline uint32_t selected = 0;
+inline TexGui::RenderData data; 
+inline TexGui::RenderData copy; 
+inline char charbuf[128] = "\0";
+
+inline spock::Image color_attachment0;
+inline spock::Image depth_attachment0;
+
 
 }

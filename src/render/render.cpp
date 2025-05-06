@@ -24,12 +24,6 @@
 #include "render_data.hpp"
 
 using namespace vkengine;
-uint32_t currentTextureIndex = 0;
-
-uint32_t selected = 0;
-TexGui::RenderData data; 
-TexGui::RenderData copy; 
-char charbuf[128] = "\0";
 
 // extending imgui with some helper functions
 namespace ImGui {
@@ -206,8 +200,23 @@ struct {
     }
 } camera;
 
+static void init_render_targets()
+{
+    //initialize main framebuffer
+    color_attachment0 = spock::create_image(spock::ctx.screenExtent, VK_FORMAT_R16G16B16A16_SFLOAT,
+                                            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    depth_attachment0 = spock::create_image(spock::ctx.screenExtent, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+}
+
+static void destroy_render_targets()
+{
+    spock::destroy_image(color_attachment0);
+    spock::destroy_image(depth_attachment0);
+}
 void vkengine::init_engine() {
     spock::init();
+    init_render_targets();
 
     //initialise descriptor allocators
     spock::ctx.descriptorAllocator.set_flags(VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
@@ -248,7 +257,7 @@ void vkengine::init_engine() {
     uniformDescLayout       = spock::create_descriptor_set_layout({{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     computeImageDesc        = spock::ctx.descriptorAllocator.allocate(computeImageDescLayout);
 
-    spock::update_descriptor_sets({{computeImageDesc, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_NULL_HANDLE, spock::ctx.framebuffer.color[0].imageView, VK_IMAGE_LAYOUT_GENERAL}}, {});
+    spock::update_descriptor_sets({{computeImageDesc, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_NULL_HANDLE, color_attachment0.imageView, VK_IMAGE_LAYOUT_GENERAL}}, {});
 
     {
         ComputePipelineBuilder builder;
@@ -263,7 +272,8 @@ void vkengine::init_engine() {
         GraphicsPipelineBuilder builder;
         vertexPipeline = builder.set_descriptor_set_layouts({uniformDescLayout, samplerDescriptorSetLayout})
                              .set_push_constant_ranges({{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VertexPushConstants)}})
-                             .set_framebuffer(spock::ctx.framebuffer)
+                             .set_color_attachments({color_attachment0})
+                             .set_depth_attachment(depth_attachment0)
                              .set_shader_stages({{VK_SHADER_STAGE_VERTEX_BIT, spock::create_shader_module("assets/shaders/mesh.vert")},
                                                  {VK_SHADER_STAGE_FRAGMENT_BIT, spock::create_shader_module("assets/shaders/mesh.frag")}})
                              .set_input_assembly_state(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
@@ -311,8 +321,8 @@ void draw_background() {
 
 void draw_geometry() {
 
-    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(spock::ctx.framebuffer.color[0].imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment = info::depth_attachment(spock::ctx.framebuffer.depth.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(color_attachment0.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment = info::depth_attachment(depth_attachment0.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo           renderInfo = info::rendering(spock::ctx.extent, &colorAttachment, &depthAttachment);
     vkCmdBeginRendering(frame->commandBuffer, &renderInfo);
@@ -352,16 +362,20 @@ static void new_frame() {
     VK_CHECK(vkWaitForFences(spock::ctx.device, 1, &frame->renderFence, true, 1000000000));
     frame->destroyQueue.flush();
     frame->descriptorAllocator.clear_pools();
-    VK_CHECK(vkResetFences(spock::ctx.device, 1, &frame->renderFence));
+    TexGui::newFrame();
 
     VK_CHECK(vkAcquireNextImageKHR(spock::ctx.device, spock::ctx.swapchain.swapchain, 1000000000, frame->swapchainSemaphore, nullptr, &swapchainImageIndex));
 
-    VkCommandBuffer cmd = frame->commandBuffer;
-    VK_CHECK(vkResetCommandBuffer(cmd, 0));
-    VkCommandBufferBeginInfo cmdBeginInfo = info::begin::command_buffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
     spock::ctx.extent.width  = std::min(spock::ctx.screenExtent.width, spock::ctx.swapchain.extent.width) * spock::ctx.renderScale;
     spock::ctx.extent.height = std::min(spock::ctx.screenExtent.height, spock::ctx.swapchain.extent.height) * spock::ctx.renderScale;
+
+    VK_CHECK(vkResetFences(spock::ctx.device, 1, &frame->renderFence));
+
+    VkCommandBuffer cmd = frame->commandBuffer;
+    VK_CHECK(vkResetCommandBuffer(cmd, 0));
+
+    VkCommandBufferBeginInfo cmdBeginInfo = info::begin::command_buffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
 
     VK_CHECK(vkBeginCommandBuffer(frame->commandBuffer, &cmdBeginInfo));
 }
@@ -389,12 +403,12 @@ static void end_frame() {
 }
 
 static void render() {
-    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    spock::image_barrier(frame->commandBuffer, color_attachment0.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background();
 
-    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.depth.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, color_attachment0.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, depth_attachment0.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     sceneData.proj = glm::perspective(glm::radians(70.f), (float)spock::ctx.extent.width / (float)spock::ctx.extent.height, 0.1f, 10000.f);
     sceneData.proj[1][1] *= -1;
@@ -402,10 +416,10 @@ static void render() {
     sceneData.view = camera.view_matrix();
     draw_geometry();
 
-    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, color_attachment0.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     spock::image_barrier(frame->commandBuffer, spock::ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    spock::blit(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, spock::ctx.swapchain.images[swapchainImageIndex], spock::ctx.extent, spock::ctx.swapchain.extent);
+    spock::blit(frame->commandBuffer, color_attachment0.image, spock::ctx.swapchain.images[swapchainImageIndex], spock::ctx.extent, spock::ctx.swapchain.extent);
 
     spock::image_barrier(frame->commandBuffer, spock::ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     draw_imgui(spock::ctx.swapchain.imageViews[swapchainImageIndex]);
@@ -499,8 +513,6 @@ void vkengine::run() {
         ImGui::Render();
         add_texgui_widgets();
 
-        TexGui::newFrame();
-
         new_frame();
         render();
         end_frame();
@@ -517,5 +529,6 @@ void vkengine::run() {
 
 void vkengine::cleanup()
 {
+    destroy_render_targets();
     spock::cleanup();
 }

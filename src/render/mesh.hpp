@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
