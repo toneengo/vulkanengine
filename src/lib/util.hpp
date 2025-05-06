@@ -38,10 +38,10 @@ inline void log_line(const char* source)
 #define NS_PER_MS  1000000
 
 #define write_uniform_buffer_descriptor(ds, src, size) do {\
-    spock::Buffer buf = create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);\
+    spock::Buffer buf = spock::create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);\
     frame->destroyQueue.push(buf);\
     void* dst = buf.info.pMappedData;\
     memcpy(dst, src, size);\
-    update_descriptor_sets({}, {{ds, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, buf.buffer, 0, size}});\
+    spock::update_descriptor_sets({}, {{ds, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, buf.buffer, 0, size}});\
 } while(0)
 

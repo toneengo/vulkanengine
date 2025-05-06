@@ -1,7 +1,7 @@
 #include "input.hpp"
-#include "vk/internal.hpp"
+#include "spock/internal.hpp"
 
-using namespace spock;
+using namespace vkengine;
 
 GLFWwindowfocusfun      prevCallbackWindowFocus;
 GLFWcursorposfun        prevCallbackCursorPos;
@@ -39,14 +39,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     else if (input.keyStates[key] == KEY_Off) input.keyStates[key] = KEY_Press;
 }
 
-void spock::init_input_callbacks()
+void vkengine::init_input_callbacks()
 {
-    prevCallbackKey = glfwSetKeyCallback(ctx.window, key_callback);
-    prevCallbackMousebutton = glfwSetMouseButtonCallback(ctx.window, mouse_button_callback);
-    prevCallbackCursorPos = glfwSetCursorPosCallback(ctx.window, cursor_pos_callback);
+    prevCallbackKey = glfwSetKeyCallback(spock::ctx.window, key_callback);
+    prevCallbackMousebutton = glfwSetMouseButtonCallback(spock::ctx.window, mouse_button_callback);
+    prevCallbackCursorPos = glfwSetCursorPosCallback(spock::ctx.window, cursor_pos_callback);
 }
 
-void spock::update_input()
+void vkengine::update_input()
 {
     input.mouseRelativeMotion = {0, 0};
     for (int i = 0; i < GLFW_KEY_LAST + 1; i++)

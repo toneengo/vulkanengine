@@ -12,23 +12,143 @@
 
 #include "lib/util.hpp"
 #include "texgui.h"
-#include "vk/core.hpp"
-#include "vk/info.hpp"
-#include "vk/internal.hpp"
-#include "vk/pipeline_builder.hpp"
-#include "vk/util.hpp"
+#include "spock/core.hpp"
+#include "spock/info.hpp"
+#include "spock/internal.hpp"
+#include "spock/pipeline_builder.hpp"
+#include "spock/util.hpp"
 #include "input.hpp"
+#include "mesh.hpp"
 #include "render.hpp"
 
 #include "render_data.hpp"
 
-using namespace spock;
+using namespace vkengine;
 uint32_t currentTextureIndex = 0;
 
 uint32_t selected = 0;
 TexGui::RenderData data; 
 TexGui::RenderData copy; 
 char charbuf[128] = "\0";
+
+static void init_imgui() {
+    // this initializes the core structures of imgui
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE},
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets                    = 0;
+
+    for (VkDescriptorPoolSize& pool_size : pool_sizes)
+        pool_info.maxSets += pool_size.descriptorCount;
+
+    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.pPoolSizes    = pool_sizes;
+
+    VkDescriptorPool imguiPool;
+    VK_CHECK(vkCreateDescriptorPool(spock::ctx.device, &pool_info, nullptr, &imguiPool));
+
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(spock::ctx.window, true);
+
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion                = VK_API_VERSION_1_3; // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
+    init_info.Instance                  = spock::ctx.instance;
+    init_info.PhysicalDevice            = spock::ctx.physicalDevice;
+    init_info.Device                    = spock::ctx.device;
+    init_info.QueueFamily               = spock::ctx.graphicsQueueFamily;
+    init_info.Queue                     = spock::ctx.graphicsQueue;
+    init_info.PipelineCache             = VK_NULL_HANDLE;
+    init_info.DescriptorPool            = imguiPool;
+    init_info.UseDynamicRendering       = true;
+    init_info.MinImageCount             = 3;
+    init_info.ImageCount                = 3;
+    init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+    //dynamic rendering parameters for imgui to use
+    init_info.PipelineRenderingCreateInfo                         = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    init_info.PipelineRenderingCreateInfo.colorAttachmentCount    = 1;
+    init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &spock::ctx.swapchain.imageFormat;
+    ImGui_ImplVulkan_Init(&init_info);
+    ImGui_ImplVulkan_CreateFontsTexture();
+
+    QUEUE_DESTROY_OBJ(imguiPool);
+}
+
+static void init_texgui() {
+    // this initializes the core structures of imgui
+
+    TexGui::Defaults::PixelSize = 2;
+    TexGui::Defaults::Font::Size = 20;
+    TexGui::Defaults::Font::MsdfPxRange = 2;
+
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+    pool_info.maxSets                    = 0;
+
+    for (VkDescriptorPoolSize& pool_size : pool_sizes)
+        pool_info.maxSets += pool_size.descriptorCount;
+
+    pool_info.poolSizeCount = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
+    pool_info.pPoolSizes    = pool_sizes;
+
+    VkDescriptorPool texguiPool;
+    VK_CHECK(vkCreateDescriptorPool(spock::ctx.device, &pool_info, nullptr, &texguiPool));
+
+    TexGui::VulkanInitInfo init_info = {};
+    init_info.ApiVersion                = VK_API_VERSION_1_3; // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
+    init_info.Instance                  = spock::ctx.instance;
+    init_info.PhysicalDevice            = spock::ctx.physicalDevice;
+    init_info.Device                    = spock::ctx.device;
+    init_info.QueueFamily               = spock::ctx.graphicsQueueFamily;
+    init_info.Queue                     = spock::ctx.graphicsQueue;
+    init_info.PipelineCache             = VK_NULL_HANDLE;
+    init_info.DescriptorPool            = texguiPool;
+    init_info.UseDynamicRendering       = true;
+    init_info.MinImageCount             = 3;
+    init_info.ImageCount                = 3;
+    init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+    //dynamic rendering parameters for imgui to use
+    init_info.PipelineRenderingCreateInfo                         = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    init_info.PipelineRenderingCreateInfo.colorAttachmentCount    = 1;
+    init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &spock::ctx.swapchain.imageFormat;
+    init_info.Allocator = spock::ctx.allocator;
+
+    TexGui::initGlfwVulkan(spock::ctx.window, init_info);
+    TexGui::loadFont("assets/fonts/Jersey10-Regular.ttf");
+    TexGui::loadTextures("assets/sprites");
+
+    QUEUE_DESTROY_OBJ(texguiPool);
+
+}
+
+static void draw_imgui(VkImageView imageView) {
+    const auto&               frame           = spock::get_frame();
+    const VkCommandBuffer     cmd             = frame.commandBuffer;
+    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo           renderInfo      = info::rendering(spock::ctx.swapchain.extent, &colorAttachment, nullptr);
+    vkCmdBeginRendering(cmd, &renderInfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    vkCmdEndRendering(cmd);
+}
+
+static void draw_texgui(VkImageView imageView, const TexGui::RenderData& rs) {
+    const auto&               frame           = spock::get_frame();
+    const VkCommandBuffer     cmd             = frame.commandBuffer;
+    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo           renderInfo      = info::rendering(spock::ctx.swapchain.extent, &colorAttachment, nullptr);
+    vkCmdBeginRendering(cmd, &renderInfo);
+    TexGui::render_Vulkan(rs, cmd);
+    vkCmdEndRendering(cmd);
+}
 
 struct {
     double yaw = 90.f;
@@ -78,15 +198,15 @@ struct {
     }
 } camera;
 
-void spock::init_engine() {
-    init();
+void vkengine::init_engine() {
+    spock::init();
 
     //initialise descriptor allocators
-    ctx.descriptorAllocator.set_flags(VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
-    ctx.descriptorAllocator.init(
+    spock::ctx.descriptorAllocator.set_flags(VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
+    spock::ctx.descriptorAllocator.init(
         {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, IMAGE_COUNT}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SAMPLER_COUNT}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_COUNT}}, 1);
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
-        ctx.frames[i].descriptorAllocator.init(
+    for (int i = 0; i < spock::FRAME_OVERLAP; i++) {
+        spock::ctx.frames[i].descriptorAllocator.init(
             {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3}, {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4}},
             1000);
     }
@@ -95,32 +215,32 @@ void spock::init_engine() {
     VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     sampl.magFilter           = VK_FILTER_NEAREST;
     sampl.minFilter           = VK_FILTER_NEAREST;
-    vkCreateSampler(ctx.device, &sampl, nullptr, &nearestSampler);
+    vkCreateSampler(spock::ctx.device, &sampl, nullptr, &nearestSampler);
 
     sampl.magFilter = VK_FILTER_LINEAR;
     sampl.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(ctx.device, &sampl, nullptr, &linearSampler);
+    vkCreateSampler(spock::ctx.device, &sampl, nullptr, &linearSampler);
 
     QUEUE_DESTROY_OBJ(linearSampler);
     QUEUE_DESTROY_OBJ(nearestSampler);
 
     //create descriptor set layouts
-    samplerDescriptorSetLayout = create_descriptor_set_layout(
+    samplerDescriptorSetLayout = spock::create_descriptor_set_layout(
         {{SAMPLER_BINDING, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, SAMPLER_COUNT}},
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT);
 
-    samplerDescriptorSet = ctx.descriptorAllocator.allocate(samplerDescriptorSetLayout);
+    samplerDescriptorSet = spock::ctx.descriptorAllocator.allocate(samplerDescriptorSetLayout);
 
     init_input_callbacks();
     init_imgui();
     init_texgui();
 
-    VkShaderModule gradient = create_shader_module("assets/shaders/gradient.comp");
-    computeImageDescLayout  = create_descriptor_set_layout({{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}}, VK_SHADER_STAGE_COMPUTE_BIT);
-    uniformDescLayout       = create_descriptor_set_layout({{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    computeImageDesc        = ctx.descriptorAllocator.allocate(computeImageDescLayout);
+    VkShaderModule gradient = spock::create_shader_module("assets/shaders/gradient.comp");
+    computeImageDescLayout  = spock::create_descriptor_set_layout({{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}}, VK_SHADER_STAGE_COMPUTE_BIT);
+    uniformDescLayout       = spock::create_descriptor_set_layout({{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    computeImageDesc        = spock::ctx.descriptorAllocator.allocate(computeImageDescLayout);
 
-    update_descriptor_sets({{computeImageDesc, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_NULL_HANDLE, ctx.framebuffer.color[0].imageView, VK_IMAGE_LAYOUT_GENERAL}}, {});
+    spock::update_descriptor_sets({{computeImageDesc, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_NULL_HANDLE, spock::ctx.framebuffer.color[0].imageView, VK_IMAGE_LAYOUT_GENERAL}}, {});
 
     {
         ComputePipelineBuilder builder;
@@ -135,9 +255,9 @@ void spock::init_engine() {
         GraphicsPipelineBuilder builder;
         vertexPipeline = builder.set_descriptor_set_layouts({uniformDescLayout, samplerDescriptorSetLayout})
                              .set_push_constant_ranges({{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VertexPushConstants)}})
-                             .set_framebuffer(ctx.framebuffer)
-                             .set_shader_stages({{VK_SHADER_STAGE_VERTEX_BIT, create_shader_module("assets/shaders/mesh.vert")},
-                                                 {VK_SHADER_STAGE_FRAGMENT_BIT, create_shader_module("assets/shaders/mesh.frag")}})
+                             .set_framebuffer(spock::ctx.framebuffer)
+                             .set_shader_stages({{VK_SHADER_STAGE_VERTEX_BIT, spock::create_shader_module("assets/shaders/mesh.vert")},
+                                                 {VK_SHADER_STAGE_FRAGMENT_BIT, spock::create_shader_module("assets/shaders/mesh.frag")}})
                              .set_input_assembly_state(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                              .set_viewport_state()
                              .set_rasterization_state(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)
@@ -158,11 +278,11 @@ void spock::init_engine() {
         create_texture(mesh.specular, currentTextureIndex++, samplerDescriptorSet, SAMPLER_BINDING, linearSampler);
     }
 
-    clean_init();
+    spock::clean_init();
 }
 
 uint32_t swapchainImageIndex = 0;
-static FrameContext* frame = nullptr;
+static spock::FrameContext* frame = nullptr;
 void draw_background() {
     // draw gradient using compute shader
     ComputePushConstants data = {
@@ -178,22 +298,22 @@ void draw_background() {
 
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so
     // we need to divide by it
-    vkCmdDispatch(frame->commandBuffer, std::ceil(ctx.extent.width / 16.0), std::ceil(ctx.extent.height / 16.0), 1);
+    vkCmdDispatch(frame->commandBuffer, std::ceil(spock::ctx.extent.width / 16.0), std::ceil(spock::ctx.extent.height / 16.0), 1);
 }
 
 void draw_geometry() {
 
-    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(ctx.framebuffer.color[0].imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment = info::depth_attachment(ctx.framebuffer.depth.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo colorAttachment = info::color_attachment(spock::ctx.framebuffer.color[0].imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment = info::depth_attachment(spock::ctx.framebuffer.depth.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    VkRenderingInfo           renderInfo = info::rendering(ctx.extent, &colorAttachment, &depthAttachment);
+    VkRenderingInfo           renderInfo = info::rendering(spock::ctx.extent, &colorAttachment, &depthAttachment);
     vkCmdBeginRendering(frame->commandBuffer, &renderInfo);
 
     vkCmdBindPipeline(frame->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vertexPipeline);
 
     // set dynamic viewport and scissor
-    set_viewport(frame->commandBuffer, 0, 0, ctx.extent.width, ctx.extent.height);
-    set_scissor(frame->commandBuffer, 0, 0, ctx.extent.width, ctx.extent.height);
+    spock::set_viewport(frame->commandBuffer, 0, 0, spock::ctx.extent.width, spock::ctx.extent.height);
+    spock::set_scissor(frame->commandBuffer, 0, 0, spock::ctx.extent.width, spock::ctx.extent.height);
 
     VkDescriptorSet globalDescriptor = frame->descriptorAllocator.allocate(uniformDescLayout);
 
@@ -220,20 +340,20 @@ void draw_geometry() {
 }
 
 static void new_frame() {
-    frame = &get_frame();
-    VK_CHECK(vkWaitForFences(ctx.device, 1, &frame->renderFence, true, 1000000000));
+    frame = &spock::get_frame();
+    VK_CHECK(vkWaitForFences(spock::ctx.device, 1, &frame->renderFence, true, 1000000000));
     frame->destroyQueue.flush();
     frame->descriptorAllocator.clear_pools();
-    VK_CHECK(vkResetFences(ctx.device, 1, &frame->renderFence));
+    VK_CHECK(vkResetFences(spock::ctx.device, 1, &frame->renderFence));
 
-    VK_CHECK(vkAcquireNextImageKHR(ctx.device, ctx.swapchain.swapchain, 1000000000, frame->swapchainSemaphore, nullptr, &swapchainImageIndex));
+    VK_CHECK(vkAcquireNextImageKHR(spock::ctx.device, spock::ctx.swapchain.swapchain, 1000000000, frame->swapchainSemaphore, nullptr, &swapchainImageIndex));
 
     VkCommandBuffer cmd = frame->commandBuffer;
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
     VkCommandBufferBeginInfo cmdBeginInfo = info::begin::command_buffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    ctx.extent.width  = std::min(ctx.screenExtent.width, ctx.swapchain.extent.width) * ctx.renderScale;
-    ctx.extent.height = std::min(ctx.screenExtent.height, ctx.swapchain.extent.height) * ctx.renderScale;
+    spock::ctx.extent.width  = std::min(spock::ctx.screenExtent.width, spock::ctx.swapchain.extent.width) * spock::ctx.renderScale;
+    spock::ctx.extent.height = std::min(spock::ctx.screenExtent.height, spock::ctx.swapchain.extent.height) * spock::ctx.renderScale;
 
     VK_CHECK(vkBeginCommandBuffer(frame->commandBuffer, &cmdBeginInfo));
 }
@@ -245,44 +365,44 @@ static void end_frame() {
     VkSemaphoreSubmitInfo     waitInfo   = info::submit::semaphore(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, frame->swapchainSemaphore);
     VkSemaphoreSubmitInfo     signalInfo = info::submit::semaphore(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, frame->renderSemaphore);
     VkSubmitInfo2             submit     = info::submit::submit(&cmdInfo, &waitInfo, &signalInfo);
-    VK_CHECK(vkQueueSubmit2(ctx.graphicsQueue, 1, &submit, frame->renderFence));
+    VK_CHECK(vkQueueSubmit2(spock::ctx.graphicsQueue, 1, &submit, frame->renderFence));
 
     VkPresentInfoKHR presentInfo   = {};
     presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.pNext              = nullptr;
-    presentInfo.pSwapchains        = &ctx.swapchain.swapchain;
+    presentInfo.pSwapchains        = &spock::ctx.swapchain.swapchain;
     presentInfo.swapchainCount     = 1;
     presentInfo.pWaitSemaphores    = &frame->renderSemaphore;
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pImageIndices      = &swapchainImageIndex;
-    VK_CHECK(vkQueuePresentKHR(ctx.graphicsQueue, &presentInfo));
+    VK_CHECK(vkQueuePresentKHR(spock::ctx.graphicsQueue, &presentInfo));
 
-    ctx.frameIdx++;
+    spock::ctx.frameIdx++;
 }
 
 static void render() {
-    image_barrier(frame->commandBuffer, ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background();
 
-    image_barrier(frame->commandBuffer, ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    image_barrier(frame->commandBuffer, ctx.framebuffer.depth.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.depth.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    sceneData.proj = glm::perspective(glm::radians(70.f), (float)ctx.extent.width / (float)ctx.extent.height, 0.1f, 10000.f);
+    sceneData.proj = glm::perspective(glm::radians(70.f), (float)spock::ctx.extent.width / (float)spock::ctx.extent.height, 0.1f, 10000.f);
     sceneData.proj[1][1] *= -1;
     camera.update();
     sceneData.view = camera.view_matrix();
     draw_geometry();
 
-    image_barrier(frame->commandBuffer, ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    image_barrier(frame->commandBuffer, ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    blit(frame->commandBuffer, ctx.framebuffer.color[0].image, ctx.swapchain.images[swapchainImageIndex], ctx.extent, ctx.swapchain.extent);
+    spock::blit(frame->commandBuffer, spock::ctx.framebuffer.color[0].image, spock::ctx.swapchain.images[swapchainImageIndex], spock::ctx.extent, spock::ctx.swapchain.extent);
 
-    image_barrier(frame->commandBuffer, ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    draw_imgui(ctx.swapchain.imageViews[swapchainImageIndex]);
-    draw_texgui(ctx.swapchain.imageViews[swapchainImageIndex], copy);
-    image_barrier(frame->commandBuffer, ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    draw_imgui(spock::ctx.swapchain.imageViews[swapchainImageIndex]);
+    draw_texgui(spock::ctx.swapchain.imageViews[swapchainImageIndex], copy);
+    spock::image_barrier(frame->commandBuffer, spock::ctx.swapchain.images[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
 
 static inline void add_texgui_widgets()
@@ -326,7 +446,7 @@ static inline void add_texgui_widgets()
 
     copy.copy(data);
 }
-void spock::run() {
+void vkengine::run() {
     using namespace std::chrono_literals;
     namespace stc = std::chrono;
 
@@ -335,7 +455,7 @@ void spock::run() {
     stc::nanoseconds second(0);
     auto lastFrame = stc::steady_clock::now();
 
-    while (!glfwWindowShouldClose(ctx.window)) {
+    while (!glfwWindowShouldClose(spock::ctx.window)) {
         //#TODO: tick != fps
         tick = stc::nanoseconds(NS_PER_SEC / FPS_LIMIT);
         auto now = stc::steady_clock::now();
@@ -380,9 +500,14 @@ void spock::run() {
         data.clear();
         TexGui::clear();
 
-        glfwMakeContextCurrent(ctx.window);
-        glfwSwapBuffers(ctx.window);
+        glfwMakeContextCurrent(spock::ctx.window);
+        glfwSwapBuffers(spock::ctx.window);
 
         frameCounter++;
     }
+}
+
+void vkengine::cleanup()
+{
+    spock::cleanup();
 }

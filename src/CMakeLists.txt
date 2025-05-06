@@ -1,5 +1,8 @@
-add_subdirectory(render)
+file(GLOB_RECURSE src_f CONFIGURE_DEPENDS
+     "*.hpp"
+     "*.cpp"
+)
 
-if(SPOCK_BUILD_ENGINE)
-    target_sources(spockengine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
-endif()
+target_sources(vulkanengine PRIVATE
+    ${src_f}
+)

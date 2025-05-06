@@ -4,7 +4,7 @@
 #include <string.h>
 #include <glm/vec2.hpp>
 
-namespace spock {
+namespace vkengine {
     enum ButtonState {
         KEY_Off = 0,
         KEY_Press = 0b0001,

@@ -1,4 +1,6 @@
-#linux only maybe macos too
+xcode:
+	cmake -S . -B xcode -G Xcode
+
 debug:
 	cmake --no-warn-unused-cli -DCMAKE_BUILD_TYPE:STRING=Debug -S . -B ./build/Debug
 	cmake --build ./build/Debug --config Debug --target all -j`nproc 2>/dev/null || getconf NPROCESSORS_CONF`

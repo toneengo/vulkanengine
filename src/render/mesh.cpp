@@ -1,15 +1,14 @@
-
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
 #include <span>
 #include <unordered_map>
-#include "core.hpp"
-#include "internal.hpp"
+#include "spock/core.hpp"
+#include "spock/internal.hpp"
+#include "mesh.hpp"
 
-using namespace spock;
-
-std::unordered_map<std::string, Image> loadedTextures;
+using namespace vkengine;
+std::unordered_map<std::string, spock::Image> loadedTextures;
 
 int                                    vertexID  = 0;
 int                                    indicesID = 0;
@@ -23,16 +22,16 @@ GPUMeshBuffers                         upload_mesh(std::span<uint32_t> indices, 
     GPUMeshBuffers newSurface;
 
     //create vertex buffer
-    newSurface.vertexBuffer = create_buffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    newSurface.vertexBuffer = spock::create_buffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                                                                     VMA_MEMORY_USAGE_GPU_ONLY);
 
     //find the adress of the vertex buffer
     VkBufferDeviceAddressInfo deviceAddressInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newSurface.vertexBuffer.buffer};
-    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(ctx.device, &deviceAddressInfo);
+    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(spock::ctx.device, &deviceAddressInfo);
 
     //create index buffer
-    newSurface.indexBuffer = create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-    Buffer staging         = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    newSurface.indexBuffer = spock::create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+    spock::Buffer staging         = spock::create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
     void*  data = staging.info.pMappedData;
 
@@ -41,33 +40,33 @@ GPUMeshBuffers                         upload_mesh(std::span<uint32_t> indices, 
     // copy index buffer
     memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
 
-    begin_immediate_command();
+    spock::begin_immediate_command();
     VkBufferCopy vertexCopy{0};
     vertexCopy.dstOffset = 0;
     vertexCopy.srcOffset = 0;
     vertexCopy.size      = vertexBufferSize;
 
-    vkCmdCopyBuffer(ctx.immCommandBuffer, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
+    vkCmdCopyBuffer(spock::ctx.immCommandBuffer, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
 
     VkBufferCopy indexCopy{0};
     indexCopy.dstOffset = 0;
     indexCopy.srcOffset = vertexBufferSize;
     indexCopy.size      = indexBufferSize;
 
-    vkCmdCopyBuffer(ctx.immCommandBuffer, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
-    end_immediate_command();
+    vkCmdCopyBuffer(spock::ctx.immCommandBuffer, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+    spock::end_immediate_command();
 
     destroy_buffer(staging);
     //we doont want to print here
-    destroyQueue.push(newSurface.indexBuffer);
-    destroyQueue.push(newSurface.vertexBuffer);
+    spock::destroyQueue.push(newSurface.indexBuffer);
+    spock::destroyQueue.push(newSurface.vertexBuffer);
 
     newSurface.indexCount = indices.size();
     newSurface.startIndex = indices[0];
     return newSurface;
 }
 
-Image load_material_texture(aiMaterial* mat, aiTextureType type, const std::string& directory) {
+spock::Image load_material_texture(aiMaterial* mat, aiTextureType type, const std::string& directory) {
     if (mat->GetTextureCount(type) == 0)
         return {};
     assert(mat->GetTextureCount(type) == 1); //only 1 texture per mesh PLZ
@@ -77,7 +76,7 @@ Image load_material_texture(aiMaterial* mat, aiTextureType type, const std::stri
 
     if (loadedTextures.contains(stdstr))
         return loadedTextures[stdstr];
-    Image texture          = create_image(stdstr.c_str(), VK_IMAGE_USAGE_SAMPLED_BIT);
+    spock::Image texture          = spock::create_image(stdstr.c_str(), VK_IMAGE_USAGE_SAMPLED_BIT);
     loadedTextures[stdstr] = texture;
     printf("Loaded mesh texture %s\n", stdstr.c_str());
     return texture;
@@ -145,7 +144,7 @@ void processNode(aiNode* node, const aiScene* scene, Model& model, const std::st
     }
 }
 
-Model spock::load_gltf_model(const char* filePath) {
+Model vkengine::load_gltf_model(const char* filePath) {
     Assimp::Importer import;
     const aiScene*   scene = import.ReadFile(filePath, aiProcess_Triangulate | aiProcess_GenNormals);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {

@@ -5,40 +5,36 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS OFF)
 
-option(SPOCK_BUILD_ENGINE "build executable" ON)
+project("vulkanengine")
 
-project("spock")
+add_executable(vulkanengine)
 
-add_library(spock)
-
-if(SPOCK_BUILD_ENGINE)
-    add_executable(spockengine)
-endif()
-
-set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "spock")
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "vulkanengine")
 
 find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(spock PRIVATE glfw)
+target_link_libraries(vulkanengine PRIVATE glfw)
 
 find_package(Vulkan REQUIRED)
-target_link_libraries(spock PUBLIC Vulkan::Vulkan)
+target_link_libraries(vulkanengine PUBLIC Vulkan::Vulkan)
 
 find_package(glslang REQUIRED)
-target_link_libraries(spock PRIVATE glslang::glslang)
-target_link_libraries(spock PRIVATE glslang::glslang-default-resource-limits)
+target_link_libraries(vulkanengine PRIVATE glslang::glslang)
+target_link_libraries(vulkanengine PRIVATE glslang::glslang-default-resource-limits)
 
 find_package(assimp REQUIRED)
-target_link_libraries(spock PRIVATE assimp::assimp)
+target_link_libraries(vulkanengine PRIVATE assimp::assimp)
+
+find_package(glm REQUIRED)
+target_link_libraries(vulkanengine PRIVATE glm::glm)
 
 find_package(assimp REQUIRED)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
-target_link_libraries(spock PRIVATE vk-bootstrap::vk-bootstrap)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/spock)
+target_link_libraries(vulkanengine PRIVATE spock)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
-
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/texgui)
-target_link_libraries(spock PRIVATE texgui)
+target_link_libraries(vulkanengine PRIVATE texgui)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug OR CMAKE_BUILD_TYPE MATCHES DEBUG)
     message(STATUS "Configuring Sector33 in Debug with CMake")
@@ -48,10 +44,7 @@ else()
     message(STATUS "Configuring Sector33 in Release with CMake")
 endif()
 
-list(APPEND Targets spock)
-if (SPOCK_BUILD_ENGINE)
-    list(APPEND Targets spockengine)
-endif()
+list(APPEND Targets vulkanengine)
 
 foreach(TARGET IN LISTS Targets)
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
@@ -61,10 +54,13 @@ foreach(TARGET IN LISTS Targets)
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
     target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/texgui/include")
-    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/VulkanMemoryAllocator/include")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/vulkanengine/include")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/texgui/include")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/spock/include")
+    target_include_directories(${TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/spock/VulkanMemoryAllocator/include")
 endforeach()
 
-target_sources(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
+target_sources(vulkanengine PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
                                         "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp"
                                         "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_demo.cpp"
                                         "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp"
@@ -73,12 +69,7 @@ target_sources(spock PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp"
                                         "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends/imgui_impl_vulkan.cpp")
 
 
-if(SPOCK_BUILD_ENGINE)
-    add_custom_target(SPOCK_assets 
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
+add_custom_target(vulkanengine_assets 
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets)
 
-    add_dependencies(spockengine SPOCK_assets spock)
-    target_link_libraries(spockengine PRIVATE spock)
-    find_package(glm REQUIRED)
-    target_link_libraries(spockengine PRIVATE glm::glm)
-endif()
+add_dependencies(vulkanengine vulkanengine_assets)

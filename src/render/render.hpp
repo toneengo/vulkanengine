@@ -1,7 +1,7 @@
 #pragma once
 
-namespace spock {
+namespace vkengine {
     void        init_engine();
     void        run();
-    extern void cleanup();
+    void        cleanup();
 }

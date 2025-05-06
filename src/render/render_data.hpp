@@ -3,9 +3,9 @@
 //user is in quotes cuz i am the user and the actual user is just using the executable.
 #include <vulkan/vulkan_core.h>
 #include <glm/glm.hpp>
-#include "vk/types.hpp"
+#include "spock/types.hpp"
 #include <chrono>
-namespace spock {
+namespace vkengine {
 
 inline VkDescriptorSetLayout computeImageDescLayout;
 inline VkDescriptorSetLayout uniformDescLayout;
