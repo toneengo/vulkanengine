@@ -31,6 +31,14 @@ TexGui::RenderData data;
 TexGui::RenderData copy; 
 char charbuf[128] = "\0";
 
+// extending imgui with some helper functions
+namespace ImGui {
+    inline bool SliderDouble(const char* label, double* v, double v_min, double v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0)
+    {
+        return SliderScalar(label, ImGuiDataType_Double, v, &v_min, &v_max, format, flags);
+    }
+}
+
 static void init_imgui() {
     // this initializes the core structures of imgui
     VkDescriptorPoolSize pool_sizes[] = {
